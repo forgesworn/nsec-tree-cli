@@ -178,7 +178,7 @@ describe('error paths', () => {
     assert.match(io.stderrBuffer, /lowercase/)
   })
 
-  it('duplicate profile save without --force exits 1', async () => {
+  it('duplicate profile save without --force exits 1 and suggests --force', async () => {
     const profileBaseDir = await mkdtemp(join(tmpdir(), 'nsec-tree-cli-'))
     tempDirs.push(profileBaseDir)
 
@@ -198,7 +198,8 @@ describe('error paths', () => {
       { profileBaseDir },
     )
     assert.equal(exitCode, 1)
-    assert.match(io.stderrBuffer, /already exists/)
+    assert.match(io.stderrBuffer, /already exists/, 'error should mention profile already exists')
+    assert.match(io.stderrBuffer, /--force/, 'error should suggest --force to overwrite')
   })
 
   it('unknown option --banana exits 1', async () => {

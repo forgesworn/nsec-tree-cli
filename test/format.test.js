@@ -1,4 +1,4 @@
-import { afterEach, describe, it } from 'node:test'
+import { afterEach, beforeEach, describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import process from 'node:process'
 import { createFormatter } from '../src/format.js'
@@ -186,5 +186,79 @@ describe('CLI formatting integration', { concurrency: 1 }, () => {
     assert.equal(exitCode, 0)
     assert.match(io.stdoutBuffer, /└─/, 'output should contain tree-drawing characters')
     assert.match(io.stdoutBuffer, /\(leaf\)/, 'output should mark the leaf node')
+  })
+})
+
+describe('--no-hints flag', { concurrency: 1 }, () => {
+  it('suppresses "Try next" suggestions from root create output', async () => {
+    const io = new MemoryIo('', false)
+    const exitCode = await runCli(['root', 'create', '--no-hints'], io)
+    assert.equal(exitCode, 0)
+    assert.doesNotMatch(io.stdoutBuffer, /Try next/, '--no-hints should suppress next-step hints')
+  })
+
+  it('without --no-hints, root create shows "Try next" suggestions', async () => {
+    const io = new MemoryIo('', false)
+    const exitCode = await runCli(['root', 'create'], io)
+    assert.equal(exitCode, 0)
+    assert.match(io.stdoutBuffer, /Try next|profile save/, 'default output should contain hints')
+  })
+
+  it('suppresses hints from derive output', async () => {
+    const io = new MemoryIo('', false)
+    const exitCode = await runCli(
+      ['derive', 'path', 'personal', '--mnemonic', TEST_MNEMONIC, '--no-hints'],
+      io,
+    )
+    assert.equal(exitCode, 0)
+    assert.doesNotMatch(io.stdoutBuffer, /Try next/, '--no-hints should suppress hints on derive')
+  })
+})
+
+describe('NSEC_TREE_NO_HINTS env var', { concurrency: 1 }, () => {
+  let savedNoHints
+
+  beforeEach(() => {
+    savedNoHints = process.env.NSEC_TREE_NO_HINTS
+  })
+
+  afterEach(() => {
+    if (savedNoHints === undefined) {
+      delete process.env.NSEC_TREE_NO_HINTS
+    } else {
+      process.env.NSEC_TREE_NO_HINTS = savedNoHints
+    }
+  })
+
+  it('NSEC_TREE_NO_HINTS=1 suppresses hints without --no-hints flag', async () => {
+    process.env.NSEC_TREE_NO_HINTS = '1'
+    const io = new MemoryIo('', false)
+    const exitCode = await runCli(['root', 'create'], io)
+    assert.equal(exitCode, 0)
+    assert.doesNotMatch(io.stdoutBuffer, /Try next/, 'env var should suppress next-step hints')
+  })
+})
+
+describe('npx detection', () => {
+  it('uses npx prefix in command suggestions when commandPrefix is set', async () => {
+    const io = new MemoryIo('', false)
+    io.commandPrefix = 'npx nsec-tree'
+    const exitCode = await runCli(
+      ['derive', 'path', 'personal', '--mnemonic', TEST_MNEMONIC],
+      io,
+    )
+    assert.equal(exitCode, 0)
+    assert.match(io.stdoutBuffer, /npx nsec-tree/, 'output should use npx prefix in suggestions')
+  })
+
+  it('uses default prefix when commandPrefix is not set', async () => {
+    const io = new MemoryIo('', false)
+    const exitCode = await runCli(
+      ['derive', 'path', 'personal', '--mnemonic', TEST_MNEMONIC],
+      io,
+    )
+    assert.equal(exitCode, 0)
+    assert.match(io.stdoutBuffer, /nsec-tree export/, 'output should use default nsec-tree prefix')
+    assert.doesNotMatch(io.stdoutBuffer, /npx nsec-tree/, 'output should not use npx prefix by default')
   })
 })

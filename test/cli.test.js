@@ -288,3 +288,66 @@ describe('nsec-tree CLI', () => {
     })
   }
 })
+
+describe('contextual next-steps (HATEOAS)', () => {
+  it('root create without profile shows copy-paste profile save command with mnemonic', async () => {
+    const io = new MemoryIo('', false)
+    const exitCode = await runCli(['root', 'create'], io)
+    assert.equal(exitCode, 0)
+    assert.match(io.stdoutBuffer, /profile save main --mnemonic/, 'should show profile save command with mnemonic')
+  })
+
+  it('root create with --name shows derive/export suggestions', async () => {
+    const profileBaseDir = await mkdtemp(join(tmpdir(), 'nsec-tree-cli-'))
+    tempDirs.push(profileBaseDir)
+
+    const io = new MemoryIo('', false)
+    const exitCode = await runCli(
+      ['root', 'create', '--name', 'main'],
+      io,
+      { profileBaseDir },
+    )
+    assert.equal(exitCode, 0)
+    assert.match(io.stdoutBuffer, /derive path personal/, 'should suggest derive path')
+    assert.match(io.stdoutBuffer, /export nsec personal/, 'should suggest export nsec')
+    assert.doesNotMatch(io.stdoutBuffer, /profile save/, 'should not show profile save when --name was used')
+  })
+
+  it('derive output includes path in export hint', async () => {
+    const io = new MemoryIo('', false)
+    const exitCode = await runCli(
+      ['derive', 'path', 'personal/forum-burner', '--mnemonic', TEST_MNEMONIC],
+      io,
+    )
+    assert.equal(exitCode, 0)
+    assert.match(io.stdoutBuffer, /export nsec personal\/forum-burner/, 'derive hint should include the derived path')
+  })
+
+  it('profile save shows storage path in output', async () => {
+    const profileBaseDir = await mkdtemp(join(tmpdir(), 'nsec-tree-cli-'))
+    tempDirs.push(profileBaseDir)
+
+    const io = new MemoryIo('', false)
+    const exitCode = await runCli(
+      ['profile', 'save', 'test-profile', '--mnemonic', TEST_MNEMONIC],
+      io,
+      { profileBaseDir },
+    )
+    assert.equal(exitCode, 0)
+    assert.match(io.stdoutBuffer, /stored at/, 'profile save should show storage path')
+    assert.match(io.stdoutBuffer, /test-profile\.json/, 'storage path should include the profile filename')
+  })
+
+  it('verify proof shows explain proofs hint', async () => {
+    const proveIo = new MemoryIo('', false)
+    await runCli(
+      ['prove', 'private', 'personal', '--mnemonic', TEST_MNEMONIC, '--json'],
+      proveIo,
+    )
+
+    const verifyIo = new MemoryIo(proveIo.stdoutBuffer, false)
+    const exitCode = await runCli(['verify', 'proof', '--stdin'], verifyIo)
+    assert.equal(exitCode, 0)
+    assert.match(verifyIo.stdoutBuffer, /explain proofs/, 'verify should suggest explain proofs')
+  })
+})
