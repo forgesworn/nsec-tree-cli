@@ -19,7 +19,7 @@ nsec-tree prove private personal/forum-burner   # prove shared root ownership
 nsec-tree explain model                         # learn how it works
 ```
 
-Every command supports `--json` for scripting and `--quiet` for pipelines.
+Every command supports `--json` for scripting, `--quiet` for pipelines, and `--no-hints` to suppress "Try next" suggestions. Set `NSEC_TREE_NO_HINTS=1` to disable hints permanently.
 
 ## Key Concepts
 

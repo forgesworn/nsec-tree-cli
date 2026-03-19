@@ -10,19 +10,24 @@ One root secret. Unlimited Nostr identities. Fully offline.
 
 ## See it in action
 
-**Create a root identity** — generates a BIP-39 mnemonic and your master npub. Write down the mnemonic; it's your recovery path.
+**Create a root identity** — generates a BIP-39 mnemonic and saves it as a local profile. Write down the mnemonic; it's your recovery path.
 
 ```
-$ nsec-tree root create
+$ nsec-tree root create --name main
 
   root type     mnemonic-backed
   recoverable   yes
   master npub   npub1wk7lycqxj5x05thzl59fszlhcmpxe4ya045662skh8elk8zy6rzs6r7hle
+  profile       main
 
   mnemonic      misery robust expire sand reflect stove life
                 hold patch electric vessel rebuild
 
   Store this mnemonic offline. It cannot be recovered.
+
+  Try next:
+    nsec-tree derive path personal
+    nsec-tree export nsec personal
 ```
 
 **Derive a purpose-built identity** — slash-separated paths create a tree. Here, `personal` is a category and `forum-burner` is a leaf identity.
@@ -101,7 +106,7 @@ This means it works on air-gapped hardware. It means your root mnemonic never le
 | `inspect`     | Examine paths and root metadata without deriving keys |
 | `explain`     | Five built-in mini-tutorials on the concepts behind the tool |
 
-Every command supports `--json` for scripting and `--quiet` for pipeline use.
+Every command supports `--json` for scripting, `--quiet` for pipeline use, and `--no-hints` to suppress the "Try next" suggestions. Set `NSEC_TREE_NO_HINTS=1` to disable hints permanently.
 
 ## Install
 

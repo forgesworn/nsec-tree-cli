@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 npm install                        # install dependencies (nsec-tree, @forgesworn/shamir-words, @scure/bip39)
-npm test                           # run all tests (81 tests across 5 files)
+npm test                           # run all tests (92 tests across 5 files)
 node --test test/cli.test.js       # run a single test file
 node ./bin/nsec-tree.js --help     # run the CLI
 ```
@@ -34,13 +34,13 @@ This is the **application layer** for the nsec-tree identity hierarchy. It owns 
 
 **Test files:**
 - `test/helpers.js` — shared `MemoryIo` class and `TEST_MNEMONIC`
-- `test/cli.test.js` — command behaviour happy paths (23 tests)
+- `test/cli.test.js` — command behaviour happy paths + contextual next-steps (28 tests)
 - `test/errors.test.js` — error paths and validation (21 tests)
 - `test/profile.test.js` — profile lifecycle integration (5 tests)
-- `test/format.test.js` — format module unit tests + CLI formatting integration (19 tests)
+- `test/format.test.js` — format module unit tests, CLI formatting integration, `--no-hints`, env var, npx detection (25 tests)
 - `test/explain.test.js` — explain topic tests (12 tests)
 
-**Testing pattern:** tests construct a `MemoryIo` instance and pass it to `runCli(argv, io, options)`. `MemoryIo` accepts `isStdoutTty` to control colour output. `options.profileBaseDir` redirects profile storage to a temp directory. No mocking of libraries.
+**Testing pattern:** tests construct a `MemoryIo` instance and pass it to `runCli(argv, io, options)`. `MemoryIo` accepts `isStdoutTty` to control colour output. Set `io.commandPrefix` to test npx detection. `options.profileBaseDir` redirects profile storage to a temp directory. No mocking of libraries.
 
 ## Conventions
 
@@ -48,6 +48,9 @@ This is the **application layer** for the nsec-tree identity hierarchy. It owns 
 - Two root types: `mnemonic-backed` (recoverable, supports Shamir) and `nsec-backed` (tree-capable, no phrase recovery) — always preserve this distinction
 - Every command supports `--json` (stable, machine-readable) and human-readable text by default
 - `--quiet` emits bare values with no formatting
+- `--no-hints` suppresses "Try next" suggestions; `NSEC_TREE_NO_HINTS=1` does the same permanently
+- Human-mode output follows a HATEOAS pattern — every command shows contextual "Try next" suggestions guiding the user to the logical next step. When `--no-hints` or the env var is set, `fmt.nextSteps` is replaced with a no-op returning `null`, which `fmt.section()` filters out.
+- npx detection: `io.commandPrefix` defaults to `nsec-tree` but shows `npx nsec-tree` when the CLI detects it was invoked via npx (checks for `_npx` in `process.argv[1]`). All hint commands use this prefix.
 - Human-mode output uses `fmt.warning()` for sensitive content (mnemonics, nsecs, shares)
 - Secret files written with mode `0o600`, directories with `0o700`
 - Path segments validated by `PATH_SEGMENT_RE`: lowercase, shell-friendly, max 32 chars, optional `@index` suffix
