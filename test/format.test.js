@@ -1,6 +1,9 @@
-import { describe, it } from 'node:test'
+import { afterEach, describe, it } from 'node:test'
 import assert from 'node:assert/strict'
+import process from 'node:process'
 import { createFormatter } from '../src/format.js'
+import { runCli } from '../src/cli.js'
+import { MemoryIo, TEST_MNEMONIC } from './helpers.js'
 
 describe('createFormatter', () => {
   describe('with colour enabled', () => {
@@ -111,5 +114,77 @@ describe('createFormatter', () => {
       ])
       assert.match(result, /leaf/)
     })
+  })
+})
+
+describe('CLI formatting integration', { concurrency: 1 }, () => {
+  let savedNoColor
+
+  afterEach(() => {
+    if (savedNoColor === undefined) {
+      delete process.env.NO_COLOR
+    } else {
+      process.env.NO_COLOR = savedNoColor
+    }
+  })
+
+  it('TTY mode output contains ANSI escape codes and box-drawing', async () => {
+    const io = new MemoryIo('', true)
+    const exitCode = await runCli(['root', 'create'], io)
+    assert.equal(exitCode, 0)
+    assert.match(io.stdoutBuffer, /\x1b\[/, 'TTY output should contain ANSI codes')
+    assert.match(io.stdoutBuffer, /╭/, 'TTY output should contain box-drawing')
+  })
+
+  it('non-TTY mode output has no ANSI codes but still has box-drawing', async () => {
+    const io = new MemoryIo('', false)
+    const exitCode = await runCli(['root', 'create'], io)
+    assert.equal(exitCode, 0)
+    assert.doesNotMatch(io.stdoutBuffer, /\x1b\[/, 'non-TTY output should not contain ANSI codes')
+    assert.match(io.stdoutBuffer, /╭/, 'non-TTY output should still have box-drawing')
+  })
+
+  it('NO_COLOR=1 disables ANSI even in TTY', async () => {
+    savedNoColor = process.env.NO_COLOR
+    process.env.NO_COLOR = '1'
+
+    const io = new MemoryIo('', true)
+    const exitCode = await runCli(['root', 'create'], io)
+    assert.equal(exitCode, 0)
+    assert.doesNotMatch(io.stdoutBuffer, /\x1b\[/, 'NO_COLOR should suppress ANSI codes')
+  })
+
+  it('--json output contains no ANSI codes and is valid JSON', async () => {
+    const io = new MemoryIo('', true)
+    const exitCode = await runCli(
+      ['derive', 'path', 'personal', '--mnemonic', TEST_MNEMONIC, '--json'],
+      io,
+    )
+    assert.equal(exitCode, 0)
+    assert.doesNotMatch(io.stdoutBuffer, /\x1b\[/, '--json output should not contain ANSI codes')
+    const parsed = JSON.parse(io.stdoutBuffer)
+    assert.equal(typeof parsed.path, 'string')
+  })
+
+  it('--quiet output has no ANSI codes and no box-drawing', async () => {
+    const io = new MemoryIo('', true)
+    const exitCode = await runCli(
+      ['root', 'create', '--quiet'],
+      io,
+    )
+    assert.equal(exitCode, 0)
+    assert.doesNotMatch(io.stdoutBuffer, /\x1b\[/, '--quiet should not contain ANSI codes')
+    assert.doesNotMatch(io.stdoutBuffer, /╭/, '--quiet should not have box-drawing')
+  })
+
+  it('derive path shows tree-drawing characters and leaf marker', async () => {
+    const io = new MemoryIo('', false)
+    const exitCode = await runCli(
+      ['derive', 'path', 'personal/forum-burner', '--mnemonic', TEST_MNEMONIC],
+      io,
+    )
+    assert.equal(exitCode, 0)
+    assert.match(io.stdoutBuffer, /└─/, 'output should contain tree-drawing characters')
+    assert.match(io.stdoutBuffer, /\(leaf\)/, 'output should mark the leaf node')
   })
 })
