@@ -1,0 +1,68 @@
+# nsec-tree-cli
+
+> Nostr users are stuck with one key per identity. Separating contexts (personal, work, anonymous) means managing unrelated keys with no structured recovery and no way to prove they're connected. nsec-tree-cli is an offline-first CLI that derives unlimited unlinkable Nostr identities from a single root secret, with optional cryptographic ownership proofs and human-friendly Shamir backup.
+
+nsec-tree-cli is for Nostr developers and power users who need compartmentalised identity without key sprawl. It works entirely offline — no DNS, no TLS, no relay connections — making it suitable for air-gapped key management. The CLI teaches its own model as you use it, with rich formatted output and built-in explain commands.
+
+## Getting Started
+
+```bash
+npx nsec-tree root create --name main
+```
+
+This generates a 12-word BIP-39 mnemonic and saves it as a local profile. From there:
+
+```bash
+nsec-tree derive path personal/forum-burner    # derive a child identity
+nsec-tree export nsec personal/forum-burner     # extract the private key
+nsec-tree prove private personal/forum-burner   # prove shared root ownership
+nsec-tree explain model                         # learn how it works
+```
+
+Every command supports `--json` for scripting and `--quiet` for pipelines.
+
+## Key Concepts
+
+- **Root** — a starting secret (mnemonic or nsec) from which all identities derive. Mnemonic-backed roots support phrase and Shamir recovery; nsec-backed roots derive the same tree but cannot be phrase-recovered.
+- **Derivation path** — a slash-separated sequence of named segments (e.g. `personal/forum-burner@0`) that deterministically produces a child identity. Same root + same path = same identity, always.
+- **Child identity** — a standalone Nostr keypair (npub/nsec) derived from the root. Unlinkable to other children by default.
+- **Ownership proof** — a cryptographic proof that a child shares a root. Private proofs hide the derivation path; full proofs reveal it. Both are optional and selective.
+- **Shamir splitting** — splits a mnemonic into N shares where any T can reconstruct it. Human-friendly word encoding via @forgesworn/shamir-words.
+
+## Commands
+
+| Command | Purpose |
+|---------|---------|
+| `root create` | Generate a new mnemonic-backed root |
+| `root restore` | Restore from an existing mnemonic |
+| `root import-nsec` | Import an existing nsec as a root |
+| `derive path <path>` | Derive a child identity at a path |
+| `export npub\|nsec\|identity <path>` | Export public key, private key, or full bundle |
+| `prove private\|full <path>` | Generate an ownership proof |
+| `verify proof <file>` | Verify a proof |
+| `shamir split` | Split mnemonic into Shamir shares |
+| `shamir recover` | Reconstruct mnemonic from shares |
+| `profile save\|list\|use\|show\|remove` | Manage local root profiles |
+| `inspect path\|root` | Examine paths and root metadata |
+| `explain model\|proofs\|recovery\|paths\|offline` | Built-in tutorials |
+
+## JSON Output
+
+All commands emit stable JSON with `--json`. Key shapes:
+
+- `root create --json` → `{ rootType, recoverable, masterNpub, mnemonic }`
+- `derive path <p> --json` → `{ rootType, path, segments, npub, publicKey, purpose, index }`
+- `export nsec <p> --json` → `{ path, nsec }`
+- `prove private <p> --json` → `{ masterPubkey, childPubkey, attestation, signature }`
+- `verify proof --json` → `{ valid, proofType, proof }`
+
+## Built On
+
+- [nsec-tree](https://www.npmjs.com/package/nsec-tree) — derivation and proof library
+- [@forgesworn/shamir-words](https://www.npmjs.com/package/@forgesworn/shamir-words) — Shamir secret sharing with BIP-39 word encoding
+
+## Optional
+
+- [JSON-SCHEMAS.md](https://github.com/forgesworn/nsec-tree-cli/blob/main/JSON-SCHEMAS.md) — full JSON output schemas for all commands
+- [CLI-SPEC.md](https://github.com/forgesworn/nsec-tree-cli/blob/main/CLI-SPEC.md) — command grammar and design principles
+- [ARCHITECTURE.md](https://github.com/forgesworn/nsec-tree-cli/blob/main/ARCHITECTURE.md) — separation of concerns between CLI and libraries

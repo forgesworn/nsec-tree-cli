@@ -34,7 +34,10 @@
     "shamir",
     "hierarchical",
     "derivation",
-    "proof"
+    "proof",
+    "key-management",
+    "bip39",
+    "air-gapped"
   ],
   "repository": {
     "type": "git",
