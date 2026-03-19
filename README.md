@@ -154,6 +154,13 @@ $ nsec-tree root create --json
 
 Pipe derivation into proof generation, feed proofs into verification, split mnemonics and recover them — all scriptable.
 
+## Documentation
+
+- [CLI-SPEC.md](./CLI-SPEC.md) — command grammar and design principles
+- [JSON-SCHEMAS.md](./JSON-SCHEMAS.md) — stable JSON output schemas for all commands
+- [ARCHITECTURE.md](./ARCHITECTURE.md) — separation of concerns between CLI and libraries
+- [MISSION.md](./MISSION.md) — why this project exists
+
 ## Built on
 
 - [`nsec-tree`](https://www.npmjs.com/package/nsec-tree) — the derivation and proof library
