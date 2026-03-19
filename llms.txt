@@ -7,7 +7,7 @@ nsec-tree-cli is for Nostr developers and power users who need compartmentalised
 ## Getting Started
 
 ```bash
-npx nsec-tree root create --name main
+npx nsec-tree-cli root create --name main
 ```
 
 This generates a 12-word BIP-39 mnemonic and saves it as a local profile. From there:

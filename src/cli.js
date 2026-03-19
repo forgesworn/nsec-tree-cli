@@ -93,7 +93,7 @@ Examples:
 function detectCommandPrefix() {
   const scriptPath = process.argv[1] ?? ''
   if (scriptPath.includes('_npx') || scriptPath.includes('.npm/_npx')) {
-    return 'npx nsec-tree'
+    return 'npx nsec-tree-cli'
   }
   return 'nsec-tree'
 }

@@ -242,13 +242,13 @@ describe('NSEC_TREE_NO_HINTS env var', { concurrency: 1 }, () => {
 describe('npx detection', () => {
   it('uses npx prefix in command suggestions when commandPrefix is set', async () => {
     const io = new MemoryIo('', false)
-    io.commandPrefix = 'npx nsec-tree'
+    io.commandPrefix = 'npx nsec-tree-cli'
     const exitCode = await runCli(
       ['derive', 'path', 'personal', '--mnemonic', TEST_MNEMONIC],
       io,
     )
     assert.equal(exitCode, 0)
-    assert.match(io.stdoutBuffer, /npx nsec-tree/, 'output should use npx prefix in suggestions')
+    assert.match(io.stdoutBuffer, /npx nsec-tree-cli/, 'output should use npx prefix in suggestions')
   })
 
   it('uses default prefix when commandPrefix is not set', async () => {
@@ -259,6 +259,6 @@ describe('npx detection', () => {
     )
     assert.equal(exitCode, 0)
     assert.match(io.stdoutBuffer, /nsec-tree export/, 'output should use default nsec-tree prefix')
-    assert.doesNotMatch(io.stdoutBuffer, /npx nsec-tree/, 'output should not use npx prefix by default')
+    assert.doesNotMatch(io.stdoutBuffer, /npx nsec-tree-cli/, 'output should not use npx prefix by default')
   })
 })

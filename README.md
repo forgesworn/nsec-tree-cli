@@ -1,4 +1,4 @@
-# nsec-tree
+# nsec-tree-cli
 
 ```
 npx nsec-tree-cli root create
@@ -6,7 +6,7 @@ npx nsec-tree-cli root create
 
 One root secret. Unlimited Nostr identities. Fully offline.
 
-`nsec-tree` is a command-line tool for **hierarchical Nostr identity management**. It lets you derive as many independent keypairs as you need from a single root secret — like a locksmith cutting unique keys from one master blank. Every derived identity has its own npub and nsec, completely unlinkable to each other, yet all traceable back to your root when you choose to prove it. The entire tool works offline. Your root secret never touches a network.
+`nsec-tree-cli` is a command-line tool for **hierarchical Nostr identity management**, built on the [`nsec-tree`](https://www.npmjs.com/package/nsec-tree) library. It lets you derive as many independent keypairs as you need from a single root secret — like a locksmith cutting unique keys from one master blank. Every derived identity has its own npub and nsec, completely unlinkable to each other, yet all traceable back to your root when you choose to prove it. The entire tool works offline. Your root secret never touches a network.
 
 ## See it in action
 

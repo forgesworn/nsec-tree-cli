@@ -16,12 +16,13 @@
   "scripts": {
     "start": "node ./bin/nsec-tree.js",
     "help": "node ./bin/nsec-tree.js --help",
-    "test": "node --test"
+    "test": "node --test 'test/**/*.test.js'"
   },
   "dependencies": {
     "@forgesworn/shamir-words": "^1.0.2",
     "@scure/bip39": "^2.0.1",
-    "nsec-tree": "^1.4.0"
+    "nsec-tree": "^1.4.0",
+    "ws": "^8.19.0"
   },
   "keywords": [
     "nostr",
