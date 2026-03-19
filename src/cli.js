@@ -419,13 +419,12 @@ async function handleRoot(parsed, io, libraries, options, fmt) {
     } else {
       lines.push(
         '',
-        `  ${fmt.c.dim}Tip: re-run with --name to save as a profile:${fmt.c.reset}`,
-        `    ${fmt.c.cyan}${options.cmd('root create --name main')}${fmt.c.reset}`,
+        `  ${fmt.c.dim}Save this root as a profile (copy and paste):${fmt.c.reset}`,
         '',
-        fmt.nextSteps([
-          options.cmd('profile save main --mnemonic "..." --use'),
-          options.cmd('derive path personal --mnemonic "..."'),
-        ]),
+        `    ${fmt.c.cyan}${options.cmd(`profile save main --mnemonic "${mnemonic}" --use`)}${fmt.c.reset}`,
+        '',
+        `  ${fmt.c.dim}Then:${fmt.c.reset}`,
+        `    ${fmt.c.cyan}${options.cmd('derive path personal')}${fmt.c.reset}`,
       )
     }
     await printText(io, fmt.section(lines))
