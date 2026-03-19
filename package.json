@@ -1,6 +1,6 @@
 {
   "name": "nsec-tree-cli",
-  "version": "1.0.0",
+  "version": "0.0.0-development",
   "description": "Offline-first CLI for hierarchical Nostr identities",
   "type": "module",
   "engines": {
