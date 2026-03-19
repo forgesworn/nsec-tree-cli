@@ -159,6 +159,15 @@ Pipe derivation into proof generation, feed proofs into verification, split mnem
 - [`nsec-tree`](https://www.npmjs.com/package/nsec-tree) — the derivation and proof library
 - [`@forgesworn/shamir-words`](https://www.npmjs.com/package/@forgesworn/shamir-words) — human-friendly Shamir secret sharing with BIP-39 word encoding
 
+## Support
+
+For issues and feature requests, see [GitHub Issues](https://github.com/forgesworn/nsec-tree-cli/issues).
+
+If you find nsec-tree-cli useful, consider sending a tip:
+
+- **Lightning:** `thedonkey@strike.me`
+- **Nostr zaps:** `npub1mgvlrnf5hm9yf0n5mf9nqmvarhvxkc6remu5ec3vf8r0txqkuk7su0e7q2`
+
 ## Licence
 
 MIT
