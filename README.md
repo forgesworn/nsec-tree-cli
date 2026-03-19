@@ -59,3 +59,28 @@ The CLI resolves dependencies in this order:
 
 That makes it usable immediately in this multi-repo workspace while still
 matching the future published package layout.
+
+## First wow flow
+
+```bash
+nsec-tree root create
+nsec-tree derive path personal
+nsec-tree derive path anon/forum-burner
+nsec-tree export nsec anon/forum-burner
+nsec-tree prove private anon/forum-burner
+```
+
+This is the core story the CLI should make obvious:
+
+- one root
+- many unlinkable identities
+- optional continuity proofs
+- fully offline-capable workflows
+
+## Planning docs
+
+- `MISSION.md`
+- `ARCHITECTURE.md`
+- `CLI-SPEC.md`
+- `ROADMAP.md`
+- `TODO.md`

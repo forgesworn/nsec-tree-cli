@@ -69,6 +69,12 @@ Usage:
   nsec-tree inspect path <path> [--json]
   nsec-tree inspect root [(--mnemonic <phrase> | --nsec <nsec> | --root-file <file> | --stdin | --profile <name>)] [--json]
   nsec-tree explain model|proofs|recovery
+
+Examples:
+  nsec-tree root create
+  nsec-tree derive path personal/forum-burner --mnemonic "abandon ... about"
+  nsec-tree export nsec anon/forum-burner --profile personal
+  nsec-tree prove private anon/forum-burner --profile personal
 `
 
 export const nodeIo = {
