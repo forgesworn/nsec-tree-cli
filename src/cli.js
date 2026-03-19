@@ -79,6 +79,14 @@ Examples:
   nsec-tree prove private anon/forum-burner --profile personal
 `
 
+function detectCommandPrefix() {
+  const scriptPath = process.argv[1] ?? ''
+  if (scriptPath.includes('_npx') || scriptPath.includes('.npm/_npx')) {
+    return 'npx nsec-tree'
+  }
+  return 'nsec-tree'
+}
+
 export const nodeIo = {
   async stdout(text) {
     process.stdout.write(text)
@@ -94,6 +102,7 @@ export const nodeIo = {
     return Buffer.concat(chunks).toString('utf8')
   },
   isStdoutTty: Boolean(process.stdout.isTTY),
+  commandPrefix: detectCommandPrefix(),
 }
 
 function parseArgs(argv) {
@@ -403,19 +412,19 @@ async function handleRoot(parsed, io, libraries, options, fmt) {
       lines.push(
         '',
         fmt.nextSteps([
-          'nsec-tree derive path personal',
-          'nsec-tree export nsec personal',
+          options.cmd('derive path personal'),
+          options.cmd('export nsec personal'),
         ]),
       )
     } else {
       lines.push(
         '',
         `  ${fmt.c.dim}Tip: re-run with --name to save as a profile:${fmt.c.reset}`,
-        `    ${fmt.c.cyan}nsec-tree root create --name main${fmt.c.reset}`,
+        `    ${fmt.c.cyan}${options.cmd('root create --name main')}${fmt.c.reset}`,
         '',
         fmt.nextSteps([
-          'nsec-tree profile save main --mnemonic "..." --use',
-          'nsec-tree derive path personal --mnemonic "..."',
+          options.cmd('profile save main --mnemonic "..." --use'),
+          options.cmd('derive path personal --mnemonic "..."'),
         ]),
       )
     }
@@ -464,9 +473,9 @@ async function handleRoot(parsed, io, libraries, options, fmt) {
     if (savedProfile) lines.push(fmt.labelValue('profile', savedProfile.name))
     if (rootSource.source) lines.push(fmt.labelValue('source', rootSource.source))
     if (savedProfile) {
-      lines.push('', fmt.nextSteps(['nsec-tree derive path personal']))
+      lines.push('', fmt.nextSteps([options.cmd('derive path personal')]))
     } else {
-      lines.push('', fmt.nextSteps([`nsec-tree ${subcommand === 'restore' ? 'root restore' : 'root import-nsec'} ... --name main`]))
+      lines.push('', fmt.nextSteps([options.cmd(`${subcommand === 'restore' ? 'root restore' : 'root import-nsec'} ... --name main`)]))
     }
     await printText(io, fmt.section(lines))
     return 0
@@ -565,7 +574,7 @@ async function handleDerive(parsed, io, libraries, options, fmt) {
       '',
       fmt.renderTree(result.segments),
       '',
-      `  ${fmt.c.dim}No secret output. Use ${fmt.c.reset}${fmt.c.cyan}nsec-tree export nsec${fmt.c.reset}${fmt.c.dim} to extract the private key.${fmt.c.reset}`,
+      `  ${fmt.c.dim}No secret output. Use ${fmt.c.reset}${fmt.c.cyan}${options.cmd('export nsec')}${fmt.c.reset}${fmt.c.dim} to extract the private key.${fmt.c.reset}`,
     ]
     await printText(io, fmt.section(lines))
     return 0
@@ -1057,6 +1066,9 @@ export async function runCli(argv, io = nodeIo, options = {}) {
 
   const useColour = io.isStdoutTty && !process.env.NO_COLOR
   const fmt = createFormatter({ colour: useColour })
+  const prefix = io.commandPrefix ?? 'nsec-tree'
+  function cmd(args) { return `${prefix} ${args}` }
+  const opts = { ...options, cmd }
 
   try {
     const parsed = parseArgs(argv)
@@ -1066,14 +1078,14 @@ export async function runCli(argv, io = nodeIo, options = {}) {
     }
 
     const command = parsed.positionals[0]
-    if (command === 'root') return await handleRoot(parsed, io, libraries, options, fmt)
-    if (command === 'derive') return await handleDerive(parsed, io, libraries, options, fmt)
-    if (command === 'export') return await handleExport(parsed, io, libraries, options, fmt)
-    if (command === 'prove') return await handleProve(parsed, io, libraries, options, fmt)
+    if (command === 'root') return await handleRoot(parsed, io, libraries, opts, fmt)
+    if (command === 'derive') return await handleDerive(parsed, io, libraries, opts, fmt)
+    if (command === 'export') return await handleExport(parsed, io, libraries, opts, fmt)
+    if (command === 'prove') return await handleProve(parsed, io, libraries, opts, fmt)
     if (command === 'verify') return await handleVerify(parsed, io, libraries, fmt)
-    if (command === 'shamir') return await handleShamir(parsed, io, libraries, options, fmt)
-    if (command === 'profile') return await handleProfile(parsed, io, libraries, options, fmt)
-    if (command === 'inspect') return await handleInspect(parsed, io, libraries, options, fmt)
+    if (command === 'shamir') return await handleShamir(parsed, io, libraries, opts, fmt)
+    if (command === 'profile') return await handleProfile(parsed, io, libraries, opts, fmt)
+    if (command === 'inspect') return await handleInspect(parsed, io, libraries, opts, fmt)
     if (command === 'explain') return await handleExplain(parsed, io, fmt)
 
     throw new CliUsageError(`Unknown command "${command}"`)
