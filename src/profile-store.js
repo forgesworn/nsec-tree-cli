@@ -102,7 +102,7 @@ export async function saveProfile(libraries, name, descriptor, options = {}) {
   await ensureDirs(options)
   const file = getProfileFile(name, options)
   if (!options.overwrite && (await pathExists(file))) {
-    throw new Error(`Profile "${name}" already exists`)
+    throw new Error(`Profile "${name}" already exists. Use --force to overwrite.`)
   }
 
   const metadata = await describeRoot(libraries, descriptor)

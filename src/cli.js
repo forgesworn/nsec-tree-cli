@@ -573,7 +573,7 @@ async function handleDerive(parsed, io, libraries, options, fmt) {
       '',
       fmt.renderTree(result.segments),
       '',
-      `  ${fmt.c.dim}No secret output. Use ${fmt.c.reset}${fmt.c.cyan}${options.cmd('export nsec')}${fmt.c.reset}${fmt.c.dim} to extract the private key.${fmt.c.reset}`,
+      `  ${fmt.c.dim}No secret output. Use ${fmt.c.reset}${fmt.c.cyan}${options.cmd(`export nsec ${parsed.positionals[2]}`)}${fmt.c.reset}${fmt.c.dim} to extract the private key.${fmt.c.reset}`,
     ]
     await printText(io, fmt.section(lines))
     return 0
