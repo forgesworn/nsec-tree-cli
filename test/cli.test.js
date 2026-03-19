@@ -294,7 +294,7 @@ describe('contextual next-steps (HATEOAS)', () => {
     const io = new MemoryIo('', false)
     const exitCode = await runCli(['root', 'create'], io)
     assert.equal(exitCode, 0)
-    assert.match(io.stdoutBuffer, /profile save main --stdin/, 'should show profile save command with mnemonic')
+    assert.match(io.stdoutBuffer, /profile save main --mnemonic "/, 'should show profile save with actual mnemonic')
   })
 
   it('root create with --name shows derive/export suggestions', async () => {
