@@ -8,6 +8,7 @@ import {
   coerceRootDescriptor,
   describeRoot,
   getActiveProfileName,
+  getProfileFile,
   listProfiles,
   loadProfile,
   removeProfile,
@@ -944,9 +945,11 @@ async function handleProfile(parsed, io, libraries, options, fmt) {
     if (hasFlag(parsed, 'json')) {
       await printJson(io, profile)
     } else {
+      const profilePath = getProfileFile(name, { baseDir: options.profileBaseDir })
       const lines = [
         fmt.labelValue('saved profile', profile.name),
         fmt.labelValue('master npub', profile.masterNpub),
+        fmt.labelValue('stored at', profilePath),
         '',
         fmt.nextSteps([
           options.cmd('derive path personal'),

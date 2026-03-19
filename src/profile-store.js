@@ -24,7 +24,7 @@ function getActiveFile(options = {}) {
   return join(getBaseDir(options), 'active-profile')
 }
 
-function getProfileFile(name, options = {}) {
+export function getProfileFile(name, options = {}) {
   return join(getProfilesDir(options), `${name}.json`)
 }
 
