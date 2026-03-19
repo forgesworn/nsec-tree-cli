@@ -1,7 +1,7 @@
 # nsec-tree
 
 ```
-npx nsec-tree root create
+npx nsec-tree-cli root create
 ```
 
 One root secret. Unlimited Nostr identities. Fully offline.
@@ -122,7 +122,7 @@ Every command supports `--json` for scripting, `--quiet` for pipeline use, and `
 Try it without installing:
 
 ```bash
-npx nsec-tree root create
+npx nsec-tree-cli root create
 ```
 
 Install globally to keep it:
