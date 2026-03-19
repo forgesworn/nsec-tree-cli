@@ -397,11 +397,27 @@ async function handleRoot(parsed, io, libraries, options, fmt) {
       fmt.labelValue('mnemonic', fmt.wrapWords(mnemonic)),
       '',
       fmt.warning('Store this mnemonic offline. It cannot be recovered.'),
-      '',
-      fmt.nextSteps(['nsec-tree derive path personal', 'nsec-tree profile save main --use']),
     ]
     if (savedProfile) {
       lines.splice(5, 0, fmt.labelValue('profile', savedProfile.name))
+      lines.push(
+        '',
+        fmt.nextSteps([
+          'nsec-tree derive path personal',
+          'nsec-tree export nsec personal',
+        ]),
+      )
+    } else {
+      lines.push(
+        '',
+        `  ${fmt.c.dim}Tip: re-run with --name to save as a profile:${fmt.c.reset}`,
+        `    ${fmt.c.cyan}nsec-tree root create --name main${fmt.c.reset}`,
+        '',
+        fmt.nextSteps([
+          'nsec-tree profile save main --mnemonic "..." --use',
+          'nsec-tree derive path personal --mnemonic "..."',
+        ]),
+      )
     }
     await printText(io, fmt.section(lines))
     return 0
@@ -447,7 +463,11 @@ async function handleRoot(parsed, io, libraries, options, fmt) {
     ]
     if (savedProfile) lines.push(fmt.labelValue('profile', savedProfile.name))
     if (rootSource.source) lines.push(fmt.labelValue('source', rootSource.source))
-    lines.push('', fmt.nextSteps(['nsec-tree derive path personal']))
+    if (savedProfile) {
+      lines.push('', fmt.nextSteps(['nsec-tree derive path personal']))
+    } else {
+      lines.push('', fmt.nextSteps([`nsec-tree ${subcommand === 'restore' ? 'root restore' : 'root import-nsec'} ... --name main`]))
+    }
     await printText(io, fmt.section(lines))
     return 0
   }
