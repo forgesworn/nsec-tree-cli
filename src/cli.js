@@ -1,0 +1,1021 @@
+import { readFile, writeFile, mkdir } from 'node:fs/promises'
+import { dirname, join } from 'node:path'
+import process from 'node:process'
+import { loadDependencies } from './deps.js'
+import {
+  coerceRootDescriptor,
+  describeRoot,
+  getActiveProfileName,
+  listProfiles,
+  loadProfile,
+  removeProfile,
+  saveProfile,
+  setActiveProfile,
+} from './profile-store.js'
+
+class CliUsageError extends Error {
+  constructor(message) {
+    super(message)
+    this.name = 'CliUsageError'
+  }
+}
+
+const BOOLEAN_OPTIONS = new Set(['json', 'quiet', 'stdin', 'help', 'force', 'use'])
+const VALUE_OPTIONS = new Set([
+  'mnemonic',
+  'nsec',
+  'root-file',
+  'passphrase',
+  'out',
+  'out-dir',
+  'name',
+  'profile',
+  'shares',
+  'threshold',
+])
+const PATH_SEGMENT_RE = /^(?<name>[a-z0-9][a-z0-9:-]{0,31})(?:@(?<index>\d+))?$/
+
+const HELP_TEXT = `nsec-tree CLI
+
+Offline-first developer tooling for hierarchical Nostr identity.
+
+Usage:
+  nsec-tree root create [--passphrase <text>] [--name <profile>] [--json] [--quiet] [--out <file>]
+  nsec-tree root restore (--mnemonic <phrase> | --root-file <file> | --stdin) [--passphrase <text>] [--name <profile>] [--json] [--quiet] [--out <file>]
+  nsec-tree root import-nsec (--nsec <nsec> | --root-file <file> | --stdin) [--name <profile>] [--json] [--quiet] [--out <file>]
+  nsec-tree root inspect [(--mnemonic <phrase> | --nsec <nsec> | --root-file <file> | --stdin | --profile <name>)] [--json]
+
+  nsec-tree derive path <path> [(--mnemonic <phrase> | --nsec <nsec> | --root-file <file> | --stdin | --profile <name>)] [--passphrase <text>] [--json]
+  nsec-tree derive persona <name> [(--mnemonic <phrase> | --nsec <nsec> | --root-file <file> | --stdin | --profile <name>)] [--passphrase <text>] [--json]
+  nsec-tree derive account <path> [(--mnemonic <phrase> | --nsec <nsec> | --root-file <file> | --stdin | --profile <name>)] [--passphrase <text>] [--json]
+
+  nsec-tree export npub <path> [(--mnemonic <phrase> | --nsec <nsec> | --root-file <file> | --stdin | --profile <name>)] [--passphrase <text>] [--json] [--quiet]
+  nsec-tree export nsec <path> [(--mnemonic <phrase> | --nsec <nsec> | --root-file <file> | --stdin | --profile <name>)] [--passphrase <text>] [--json] [--quiet] [--out <file>]
+  nsec-tree export identity <path> [(--mnemonic <phrase> | --nsec <nsec> | --root-file <file> | --stdin | --profile <name>)] [--passphrase <text>] [--json] [--out <file>]
+
+  nsec-tree prove private <path> [(--mnemonic <phrase> | --nsec <nsec> | --root-file <file> | --stdin | --profile <name>)] [--passphrase <text>] [--json] [--out <file>]
+  nsec-tree prove full <path> [(--mnemonic <phrase> | --nsec <nsec> | --root-file <file> | --stdin | --profile <name>)] [--passphrase <text>] [--json] [--out <file>]
+  nsec-tree verify proof [<file> | --stdin] [--json] [--quiet]
+
+  nsec-tree shamir split [(--mnemonic <phrase> | --root-file <file> | --stdin | --profile <name>)] --shares <n> --threshold <t> [--json] [--out-dir <dir>]
+  nsec-tree shamir recover [<share-file> ... | --stdin] [--json] [--out <file>]
+
+  nsec-tree profile save <name> (--mnemonic <phrase> | --nsec <nsec> | --root-file <file> | --stdin) [--passphrase <text>] [--force] [--use] [--json]
+  nsec-tree profile list [--json]
+  nsec-tree profile use <name> [--json]
+  nsec-tree profile show [name] [--json]
+  nsec-tree profile remove <name> [--json]
+
+  nsec-tree inspect path <path> [--json]
+  nsec-tree inspect root [(--mnemonic <phrase> | --nsec <nsec> | --root-file <file> | --stdin | --profile <name>)] [--json]
+  nsec-tree explain model|proofs|recovery
+`
+
+export const nodeIo = {
+  async stdout(text) {
+    process.stdout.write(text)
+  },
+  async stderr(text) {
+    process.stderr.write(text)
+  },
+  async readStdin() {
+    const chunks = []
+    for await (const chunk of process.stdin) {
+      chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk)
+    }
+    return Buffer.concat(chunks).toString('utf8')
+  },
+  isStdoutTty: Boolean(process.stdout.isTTY),
+}
+
+function parseArgs(argv) {
+  const positionals = []
+  const options = new Map()
+
+  for (let index = 0; index < argv.length; index++) {
+    const token = argv[index]
+    if (!token.startsWith('--')) {
+      positionals.push(token)
+      continue
+    }
+
+    const raw = token.slice(2)
+    if (!raw) {
+      throw new CliUsageError('Invalid option "--"')
+    }
+
+    const eqIndex = raw.indexOf('=')
+    const name = eqIndex === -1 ? raw : raw.slice(0, eqIndex)
+    const inlineValue = eqIndex === -1 ? undefined : raw.slice(eqIndex + 1)
+
+    if (BOOLEAN_OPTIONS.has(name)) {
+      if (inlineValue !== undefined) {
+        throw new CliUsageError(`Option "--${name}" does not accept a value`)
+      }
+      options.set(name, true)
+      continue
+    }
+
+    if (!VALUE_OPTIONS.has(name)) {
+      throw new CliUsageError(`Unknown option "--${name}"`)
+    }
+
+    const value = inlineValue ?? argv[index + 1]
+    if (value === undefined || value.startsWith('--')) {
+      throw new CliUsageError(`Option "--${name}" requires a value`)
+    }
+    options.set(name, value)
+    if (inlineValue === undefined) {
+      index++
+    }
+  }
+
+  return { positionals, options }
+}
+
+function hasFlag(parsed, name) {
+  return parsed.options.get(name) === true
+}
+
+function getOption(parsed, name) {
+  const value = parsed.options.get(name)
+  return typeof value === 'string' ? value : undefined
+}
+
+function getEnv(name) {
+  const value = process.env[name]
+  return typeof value === 'string' && value.length > 0 ? value : undefined
+}
+
+function ensureNoExtraPositionals(parsed, expected) {
+  if (parsed.positionals.length !== expected) {
+    throw new CliUsageError('Unexpected positional arguments')
+  }
+}
+
+function toNumberOption(parsed, name) {
+  const value = getOption(parsed, name)
+  if (value === undefined) {
+    return undefined
+  }
+  const number = Number.parseInt(value, 10)
+  if (!Number.isInteger(number)) {
+    throw new CliUsageError(`Option "--${name}" must be an integer`)
+  }
+  return number
+}
+
+function normalizePathSegments(segments) {
+  return segments.map((segment) => `${segment.name}@${segment.requestedIndex}`).join('/')
+}
+
+function parsePath(rawPath) {
+  if (!rawPath || rawPath.startsWith('/') || rawPath.endsWith('/')) {
+    throw new CliUsageError('Path must be non-empty and must not start or end with "/"')
+  }
+
+  return rawPath.split('/').map((rawSegment) => {
+    const match = PATH_SEGMENT_RE.exec(rawSegment)
+    if (!match || !match.groups || !match.groups.name) {
+      throw new CliUsageError(
+        `Path segment "${rawSegment}" is invalid: names must be lowercase, shell-friendly, and up to 32 chars`,
+      )
+    }
+    return {
+      name: match.groups.name,
+      requestedIndex: match.groups.index ? Number.parseInt(match.groups.index, 10) : 0,
+    }
+  })
+}
+
+async function printText(io, text) {
+  await io.stdout(text.endsWith('\n') ? text : `${text}\n`)
+}
+
+async function printJson(io, value) {
+  await io.stdout(`${JSON.stringify(value, null, 2)}\n`)
+}
+
+async function writeSecretFile(path, content) {
+  await mkdir(dirname(path), { recursive: true, mode: 0o700 })
+  await writeFile(path, content, { mode: 0o600 })
+}
+
+async function warnIfSensitive(io, label) {
+  if (io.isStdoutTty) {
+    await io.stderr(`Sensitive output follows for ${label}. Store it securely.\n`)
+  }
+}
+
+function formatRootSummary(summary, extra = {}) {
+  const lines = [
+    `root type: ${summary.rootType}`,
+    `recoverable: ${summary.recoverable ? 'yes' : 'no'}`,
+    `master npub: ${summary.masterNpub}`,
+  ]
+  if (extra.profileName) {
+    lines.push(`profile: ${extra.profileName}`)
+  }
+  if (extra.source) {
+    lines.push(`source: ${extra.source}`)
+  }
+  return `${lines.join('\n')}\n`
+}
+
+function readDescriptorFromText(text) {
+  const trimmed = text.trim()
+  if (!trimmed) {
+    throw new CliUsageError('Input text is empty')
+  }
+
+  try {
+    return coerceRootDescriptor(JSON.parse(trimmed))
+  } catch {
+    if (trimmed.startsWith('nsec1')) {
+      return { type: 'nsec-backed', nsec: trimmed }
+    }
+    return { type: 'mnemonic-backed', mnemonic: trimmed }
+  }
+}
+
+async function resolveRootSource(parsed, io, libraries, options = {}) {
+  const mnemonic = getOption(parsed, 'mnemonic') ?? getEnv('NSEC_TREE_MNEMONIC')
+  const nsec = getOption(parsed, 'nsec') ?? getEnv('NSEC_TREE_NSEC')
+  const rootFile = getOption(parsed, 'root-file')
+  const useStdin = hasFlag(parsed, 'stdin')
+  const explicitProfile = getOption(parsed, 'profile') ?? getEnv('NSEC_TREE_PROFILE')
+  const passphrase = getOption(parsed, 'passphrase')
+
+  const labels = [
+    mnemonic ? 'mnemonic' : null,
+    nsec ? 'nsec' : null,
+    rootFile ? 'root-file' : null,
+    useStdin ? 'stdin' : null,
+    explicitProfile ? 'profile' : null,
+  ].filter(Boolean)
+
+  if (labels.length > 1) {
+    throw new CliUsageError(`Expected exactly one root input source, got ${labels.length}`)
+  }
+
+  if (mnemonic) {
+    return {
+      descriptor: { type: 'mnemonic-backed', mnemonic, passphrase },
+      source: 'explicit mnemonic',
+    }
+  }
+  if (nsec) {
+    return {
+      descriptor: { type: 'nsec-backed', nsec },
+      source: 'explicit nsec',
+    }
+  }
+  if (rootFile || useStdin) {
+    const text = rootFile ? await readFile(rootFile, 'utf8') : await io.readStdin()
+    return {
+      descriptor: readDescriptorFromText(text),
+      source: rootFile ? `file ${rootFile}` : 'stdin',
+    }
+  }
+  if (explicitProfile) {
+    const profile = await loadProfile(explicitProfile, { baseDir: options.profileBaseDir })
+    return {
+      descriptor: profile.root,
+      profileName: profile.name,
+      source: `profile ${profile.name}`,
+    }
+  }
+
+  if (options.allowImplicitProfile !== false) {
+    const active = await getActiveProfileName({ baseDir: options.profileBaseDir })
+    if (active) {
+      const profile = await loadProfile(active, { baseDir: options.profileBaseDir })
+      return {
+        descriptor: profile.root,
+        profileName: profile.name,
+        source: `active profile ${profile.name}`,
+      }
+    }
+  }
+
+  throw new CliUsageError('No root input provided. Use --mnemonic, --nsec, --root-file, --stdin, or --profile.')
+}
+
+function openRoot(libraries, descriptor) {
+  const root =
+    descriptor.type === 'mnemonic-backed'
+      ? libraries.nsecTree.fromMnemonic(descriptor.mnemonic, descriptor.passphrase)
+      : libraries.nsecTree.fromNsec(descriptor.nsec)
+
+  return {
+    root,
+    rootType: descriptor.type,
+    recoverable: descriptor.type === 'mnemonic-backed',
+  }
+}
+
+function derivePath(libraries, root, rawPath) {
+  const pathSegments = parsePath(rawPath)
+  const identities = []
+  const derivedSegments = []
+  let currentIdentity = null
+
+  for (const segment of pathSegments) {
+    const identity = currentIdentity
+      ? libraries.nsecTree.deriveFromIdentity(currentIdentity, segment.name, segment.requestedIndex)
+      : libraries.nsecTree.derive(root, segment.name, segment.requestedIndex)
+    identities.push(identity)
+    currentIdentity = identity
+    derivedSegments.push({
+      ...segment,
+      actualIndex: identity.index,
+      npub: identity.npub,
+    })
+  }
+
+  if (!currentIdentity) {
+    throw new CliUsageError('Path must contain at least one segment')
+  }
+
+  return {
+    identity: currentIdentity,
+    normalizedPath: normalizePathSegments(pathSegments),
+    segments: derivedSegments,
+    identities,
+  }
+}
+
+function formatDerivedPath(result, summary) {
+  return [
+    `root type: ${summary.rootType}`,
+    `recoverable: ${summary.recoverable ? 'yes' : 'no'}`,
+    `path: ${result.normalizedPath}`,
+    'segments:',
+    ...result.segments.map(
+      (segment, index) =>
+        `  ${index + 1}. ${segment.name} requested=${segment.requestedIndex} effective=${segment.actualIndex}`,
+    ),
+    `npub: ${result.identity.npub}`,
+    'secret output requested: no',
+  ].join('\n')
+}
+
+function identityPayload(result) {
+  return {
+    path: result.normalizedPath,
+    segments: result.segments,
+    npub: result.identity.npub,
+    nsec: result.identity.nsec,
+    publicKey: Buffer.from(result.identity.publicKey).toString('hex'),
+    purpose: result.identity.purpose,
+    index: result.identity.index,
+  }
+}
+
+function explainTopic(topic) {
+  if (topic === 'model') {
+    return [
+      'nsec-tree is an offline-first hierarchy for Nostr identities.',
+      'Both mnemonic-backed roots and nsec-backed roots can derive the identity tree.',
+      'The difference is recovery: only mnemonic-backed roots can do phrase and Shamir recovery.',
+      'Derived children are real standalone Nostr identities with their own nsec and npub.',
+    ].join('\n')
+  }
+  if (topic === 'proofs') {
+    return [
+      'Private proofs show shared root ownership without revealing derivation context.',
+      'Full proofs reveal the path metadata used to derive the child identity.',
+      'Proofs are optional and selective. They are not required for everyday identity use.',
+    ].join('\n')
+  }
+  if (topic === 'recovery') {
+    return [
+      'Mnemonic-backed roots are recovery-capable and can be Shamir-split for backup workflows.',
+      'nsec-backed roots remain fully tree-capable, but they do not gain phrase recovery automatically.',
+      'Use mnemonic-backed roots when long-term recovery and split backup matter.',
+    ].join('\n')
+  }
+  throw new CliUsageError(`Unknown explain topic "${topic}"`)
+}
+
+async function maybeSaveProfileAfterRootCommand(libraries, parsed, descriptor, options) {
+  const name = getOption(parsed, 'name')
+  if (!name) {
+    return undefined
+  }
+  const profile = await saveProfile(libraries, name, descriptor, {
+    baseDir: options.profileBaseDir,
+    overwrite: hasFlag(parsed, 'force'),
+  })
+  await setActiveProfile(name, { baseDir: options.profileBaseDir })
+  return profile
+}
+
+async function handleRoot(parsed, io, libraries, options) {
+  const subcommand = parsed.positionals[1]
+
+  if (subcommand === 'create') {
+    ensureNoExtraPositionals(parsed, 2)
+    const mnemonic = libraries.bip39.generateMnemonic(libraries.bip39English.wordlist, 128)
+    const descriptor = {
+      type: 'mnemonic-backed',
+      mnemonic,
+      passphrase: getOption(parsed, 'passphrase'),
+    }
+    const summary = await describeRoot(libraries, descriptor)
+    const savedProfile = await maybeSaveProfileAfterRootCommand(libraries, parsed, descriptor, options)
+    const outFile = getOption(parsed, 'out')
+    if (outFile) {
+      await writeSecretFile(outFile, `${JSON.stringify(descriptor, null, 2)}\n`)
+    }
+    await warnIfSensitive(io, 'root create')
+    const payload = {
+      ...summary,
+      mnemonic,
+      profile: savedProfile?.name,
+    }
+    if (hasFlag(parsed, 'json')) {
+      await printJson(io, payload)
+      return 0
+    }
+    if (hasFlag(parsed, 'quiet')) {
+      await printText(io, mnemonic)
+      return 0
+    }
+    await printText(
+      io,
+      `${formatRootSummary(summary, { profileName: savedProfile?.name })}mnemonic: ${mnemonic}`,
+    )
+    return 0
+  }
+
+  if (subcommand === 'restore' || subcommand === 'import-nsec') {
+    ensureNoExtraPositionals(parsed, 2)
+    const rootSource = await resolveRootSource(parsed, io, libraries, {
+      profileBaseDir: options.profileBaseDir,
+      allowImplicitProfile: false,
+    })
+    if (subcommand === 'restore' && rootSource.descriptor.type !== 'mnemonic-backed') {
+      throw new CliUsageError('root restore expects mnemonic-backed input')
+    }
+    if (subcommand === 'import-nsec' && rootSource.descriptor.type !== 'nsec-backed') {
+      throw new CliUsageError('root import-nsec expects nsec-backed input')
+    }
+    const summary = await describeRoot(libraries, rootSource.descriptor)
+    const savedProfile = await maybeSaveProfileAfterRootCommand(libraries, parsed, rootSource.descriptor, options)
+    const outFile = getOption(parsed, 'out')
+    if (outFile) {
+      await writeSecretFile(outFile, `${JSON.stringify(rootSource.descriptor, null, 2)}\n`)
+    }
+    const payload = {
+      ...summary,
+      profile: savedProfile?.name,
+    }
+    if (hasFlag(parsed, 'json')) {
+      await printJson(io, payload)
+      return 0
+    }
+    if (hasFlag(parsed, 'quiet')) {
+      await printText(io, summary.masterNpub)
+      return 0
+    }
+    await printText(
+      io,
+      formatRootSummary(summary, { profileName: savedProfile?.name, source: rootSource.source }),
+    )
+    return 0
+  }
+
+  if (subcommand === 'inspect') {
+    ensureNoExtraPositionals(parsed, 2)
+    const rootSource = await resolveRootSource(parsed, io, libraries, {
+      profileBaseDir: options.profileBaseDir,
+      allowImplicitProfile: true,
+    })
+    const summary = await describeRoot(libraries, rootSource.descriptor)
+    const payload = {
+      ...summary,
+      source: rootSource.source,
+      profile: rootSource.profileName,
+    }
+    if (hasFlag(parsed, 'json')) {
+      await printJson(io, payload)
+      return 0
+    }
+    await printText(
+      io,
+      formatRootSummary(summary, { profileName: rootSource.profileName, source: rootSource.source }),
+    )
+    return 0
+  }
+
+  throw new CliUsageError(`Unknown root subcommand "${subcommand ?? ''}"`)
+}
+
+async function withDerivedPath(parsed, io, libraries, options, handler) {
+  const rootSource = await resolveRootSource(parsed, io, libraries, {
+    profileBaseDir: options.profileBaseDir,
+    allowImplicitProfile: true,
+  })
+  const pathArg = parsed.positionals[2]
+  if (!pathArg) {
+    throw new CliUsageError('Path argument is required')
+  }
+  const opened = openRoot(libraries, rootSource.descriptor)
+  let result
+  try {
+    result = derivePath(libraries, opened.root, pathArg)
+    return await handler(result, { ...opened, ...rootSource })
+  } finally {
+    if (result) {
+      for (const identity of result.identities) {
+        libraries.nsecTree.zeroise(identity)
+      }
+    }
+    opened.root.destroy()
+  }
+}
+
+async function handleDerive(parsed, io, libraries, options) {
+  const subcommand = parsed.positionals[1]
+  if (!['path', 'persona', 'account'].includes(subcommand)) {
+    throw new CliUsageError('Supported derive subcommands are: path, persona, account')
+  }
+
+  if ((subcommand === 'persona' || subcommand === 'account') && parsed.positionals[2]) {
+    parsed = {
+      ...parsed,
+      positionals: ['derive', 'path', parsed.positionals[2]],
+    }
+  }
+
+  return withDerivedPath(parsed, io, libraries, options, async (result, rootInfo) => {
+    const payload = {
+      rootType: rootInfo.rootType,
+      recoverable: rootInfo.recoverable,
+      path: result.normalizedPath,
+      segments: result.segments,
+      npub: result.identity.npub,
+      publicKey: Buffer.from(result.identity.publicKey).toString('hex'),
+      purpose: result.identity.purpose,
+      index: result.identity.index,
+      secretRequested: false,
+      profile: rootInfo.profileName,
+    }
+    if (hasFlag(parsed, 'json')) {
+      await printJson(io, payload)
+      return 0
+    }
+    await printText(io, formatDerivedPath(result, rootInfo))
+    return 0
+  })
+}
+
+async function handleExport(parsed, io, libraries, options) {
+  const subcommand = parsed.positionals[1]
+  if (!['npub', 'nsec', 'identity'].includes(subcommand)) {
+    throw new CliUsageError('Supported export subcommands are: npub, nsec, identity')
+  }
+
+  return withDerivedPath(parsed, io, libraries, options, async (result) => {
+    const outFile = getOption(parsed, 'out')
+    if (subcommand === 'npub') {
+      const payload = { path: result.normalizedPath, npub: result.identity.npub }
+      if (hasFlag(parsed, 'json')) {
+        await printJson(io, payload)
+      } else if (hasFlag(parsed, 'quiet')) {
+        await printText(io, result.identity.npub)
+      } else {
+        await printText(io, `path: ${result.normalizedPath}\nnpub: ${result.identity.npub}`)
+      }
+      return 0
+    }
+
+    if (subcommand === 'nsec') {
+      await warnIfSensitive(io, 'export nsec')
+      if (outFile) {
+        await writeSecretFile(
+          outFile,
+          hasFlag(parsed, 'json')
+            ? `${JSON.stringify({ path: result.normalizedPath, nsec: result.identity.nsec }, null, 2)}\n`
+            : `${result.identity.nsec}\n`,
+        )
+      }
+      if (hasFlag(parsed, 'json')) {
+        await printJson(io, { path: result.normalizedPath, nsec: result.identity.nsec })
+      } else if (hasFlag(parsed, 'quiet')) {
+        await printText(io, result.identity.nsec)
+      } else {
+        await printText(io, `path: ${result.normalizedPath}\nnsec: ${result.identity.nsec}`)
+      }
+      return 0
+    }
+
+    const payload = identityPayload(result)
+    await warnIfSensitive(io, 'export identity')
+    if (outFile) {
+      await writeSecretFile(outFile, `${JSON.stringify(payload, null, 2)}\n`)
+    }
+    await printJson(io, payload)
+    return 0
+  })
+}
+
+async function handleProve(parsed, io, libraries, options) {
+  const subcommand = parsed.positionals[1]
+  if (!['private', 'full'].includes(subcommand)) {
+    throw new CliUsageError('Supported prove subcommands are: private, full')
+  }
+
+  return withDerivedPath(parsed, io, libraries, options, async (result, rootInfo) => {
+    const proof =
+      subcommand === 'private'
+        ? libraries.nsecTree.createBlindProof(rootInfo.root, result.identity)
+        : libraries.nsecTree.createFullProof(rootInfo.root, result.identity)
+
+    const outFile = getOption(parsed, 'out')
+    if (outFile) {
+      await writeSecretFile(outFile, `${JSON.stringify(proof, null, 2)}\n`)
+    }
+    if (hasFlag(parsed, 'json')) {
+      await printJson(io, proof)
+    } else {
+      await printText(io, JSON.stringify(proof, null, 2))
+    }
+    return 0
+  })
+}
+
+function coerceProof(raw) {
+  if (typeof raw !== 'object' || raw === null) {
+    throw new CliUsageError('Proof JSON must be an object')
+  }
+  if (raw.proof && typeof raw.proof === 'object') {
+    return coerceProof(raw.proof)
+  }
+  if (
+    typeof raw.masterPubkey !== 'string' ||
+    typeof raw.childPubkey !== 'string' ||
+    typeof raw.attestation !== 'string' ||
+    typeof raw.signature !== 'string'
+  ) {
+    throw new CliUsageError('Proof JSON is missing required fields')
+  }
+  return raw
+}
+
+async function handleVerify(parsed, io, libraries) {
+  if (parsed.positionals[1] !== 'proof') {
+    throw new CliUsageError('Only "verify proof" is supported')
+  }
+  const proofFile = parsed.positionals[2]
+  const useStdin = hasFlag(parsed, 'stdin') || proofFile === '-'
+  if (!useStdin && !proofFile) {
+    throw new CliUsageError('Provide a proof file path or use --stdin')
+  }
+  if (useStdin && proofFile && proofFile !== '-') {
+    throw new CliUsageError('Use either a proof file path or --stdin')
+  }
+
+  const rawText = useStdin ? await io.readStdin() : await readFile(proofFile, 'utf8')
+  const proof = coerceProof(JSON.parse(rawText))
+  const valid = libraries.nsecTree.verifyProof(proof)
+  const proofType = proof.purpose === undefined ? 'private' : 'full'
+
+  if (hasFlag(parsed, 'json')) {
+    await printJson(io, { valid, proofType, proof })
+  } else if (hasFlag(parsed, 'quiet')) {
+    await printText(io, valid ? 'valid' : 'invalid')
+  } else {
+    await printText(
+      io,
+      [
+        `valid: ${valid ? 'yes' : 'no'}`,
+        `proof type: ${proofType}`,
+        `master pubkey: ${proof.masterPubkey}`,
+        `child pubkey: ${proof.childPubkey}`,
+      ].join('\n'),
+    )
+  }
+  return valid ? 0 : 1
+}
+
+function shareWordsFromText(text) {
+  return text
+    .trim()
+    .split(/\s+/)
+    .map((word) => word.trim().toLowerCase())
+    .filter(Boolean)
+}
+
+async function handleShamir(parsed, io, libraries, options) {
+  const subcommand = parsed.positionals[1]
+
+  if (subcommand === 'split') {
+    ensureNoExtraPositionals(parsed, 2)
+    const shares = toNumberOption(parsed, 'shares')
+    const threshold = toNumberOption(parsed, 'threshold')
+    if (shares === undefined || threshold === undefined) {
+      throw new CliUsageError('shamir split requires --shares and --threshold')
+    }
+    const rootSource = await resolveRootSource(parsed, io, libraries, {
+      profileBaseDir: options.profileBaseDir,
+      allowImplicitProfile: true,
+    })
+    if (rootSource.descriptor.type !== 'mnemonic-backed') {
+      throw new CliUsageError(
+        'This root is nsec-backed, so Shamir split is unavailable without a mnemonic-backed root',
+      )
+    }
+
+    const entropy = libraries.bip39.mnemonicToEntropy(
+      rootSource.descriptor.mnemonic,
+      libraries.bip39English.wordlist,
+    )
+    try {
+      const rawShares = libraries.shamirWords.splitSecret(entropy, threshold, shares)
+      const payload = rawShares.map((share) => {
+        const words = libraries.shamirWords.shareToWords(share)
+        return {
+          index: share.id,
+          threshold: share.threshold,
+          words,
+          phrase: words.join(' '),
+        }
+      })
+
+      const outDir = getOption(parsed, 'out-dir')
+      if (outDir) {
+        await mkdir(outDir, { recursive: true, mode: 0o700 })
+        for (const share of payload) {
+          await writeSecretFile(join(outDir, `share-${share.index}.txt`), `${share.phrase}\n`)
+        }
+      }
+      await warnIfSensitive(io, 'shamir split')
+      if (hasFlag(parsed, 'json')) {
+        await printJson(io, {
+          rootType: 'mnemonic-backed',
+          recoverable: true,
+          shares: payload,
+        })
+      } else {
+        const lines = ['root type: mnemonic-backed', 'recoverable: yes', `shares: ${shares}`, `threshold: ${threshold}`]
+        for (const share of payload) {
+          lines.push(`share ${share.index}: ${share.phrase}`)
+        }
+        await printText(io, lines.join('\n'))
+      }
+      return 0
+    } finally {
+      entropy.fill(0)
+    }
+  }
+
+  if (subcommand === 'recover') {
+    const files = parsed.positionals.slice(2)
+    const useStdin = hasFlag(parsed, 'stdin')
+    if (!useStdin && files.length === 0) {
+      throw new CliUsageError('Provide share files or use --stdin')
+    }
+
+    const shareTexts = []
+    if (useStdin) {
+      const stdinText = await io.readStdin()
+      for (const line of stdinText.split(/\r?\n/)) {
+        if (line.trim()) {
+          shareTexts.push(line.trim())
+        }
+      }
+    }
+    for (const file of files) {
+      shareTexts.push((await readFile(file, 'utf8')).trim())
+    }
+
+    const shares = shareTexts.map((text) => libraries.shamirWords.wordsToShare(shareWordsFromText(text)))
+    const threshold = shares[0]?.threshold
+    if (!threshold) {
+      throw new CliUsageError('No valid shares were provided')
+    }
+    const entropy = libraries.shamirWords.reconstructSecret(shares, threshold)
+    try {
+      const mnemonic = libraries.bip39.entropyToMnemonic(entropy, libraries.bip39English.wordlist)
+      const outFile = getOption(parsed, 'out')
+      if (outFile) {
+        await writeSecretFile(outFile, `${mnemonic}\n`)
+      }
+      await warnIfSensitive(io, 'shamir recover')
+      if (hasFlag(parsed, 'json')) {
+        await printJson(io, {
+          rootType: 'mnemonic-backed',
+          recoverable: true,
+          mnemonic,
+        })
+      } else {
+        await printText(io, `mnemonic: ${mnemonic}`)
+      }
+      return 0
+    } finally {
+      entropy.fill(0)
+    }
+  }
+
+  throw new CliUsageError(`Unknown shamir subcommand "${subcommand ?? ''}"`)
+}
+
+async function handleProfile(parsed, io, libraries, options) {
+  const subcommand = parsed.positionals[1]
+
+  if (subcommand === 'save') {
+    const name = parsed.positionals[2]
+    if (!name) {
+      throw new CliUsageError('profile save requires a profile name')
+    }
+    ensureNoExtraPositionals(parsed, 3)
+    const rootSource = await resolveRootSource(parsed, io, libraries, {
+      profileBaseDir: options.profileBaseDir,
+      allowImplicitProfile: false,
+    })
+    const profile = await saveProfile(libraries, name, rootSource.descriptor, {
+      baseDir: options.profileBaseDir,
+      overwrite: hasFlag(parsed, 'force'),
+    })
+    if (hasFlag(parsed, 'use')) {
+      await setActiveProfile(name, { baseDir: options.profileBaseDir })
+    }
+    if (hasFlag(parsed, 'json')) {
+      await printJson(io, profile)
+    } else {
+      await printText(io, `saved profile: ${profile.name}\nmaster npub: ${profile.masterNpub}`)
+    }
+    return 0
+  }
+
+  if (subcommand === 'list') {
+    ensureNoExtraPositionals(parsed, 2)
+    const profiles = await listProfiles({ baseDir: options.profileBaseDir })
+    if (hasFlag(parsed, 'json')) {
+      await printJson(io, profiles)
+    } else if (profiles.length === 0) {
+      await printText(io, 'No profiles saved yet.')
+    } else {
+      await printText(
+        io,
+        profiles
+          .map((profile) => {
+            const prefix = profile.active ? '* ' : '  '
+            return `${prefix}${profile.name} (${profile.rootType}, recoverable=${profile.recoverable ? 'yes' : 'no'})`
+          })
+          .join('\n'),
+      )
+    }
+    return 0
+  }
+
+  if (subcommand === 'use') {
+    const name = parsed.positionals[2]
+    if (!name) {
+      throw new CliUsageError('profile use requires a profile name')
+    }
+    ensureNoExtraPositionals(parsed, 3)
+    await setActiveProfile(name, { baseDir: options.profileBaseDir })
+    if (hasFlag(parsed, 'json')) {
+      await printJson(io, { activeProfile: name })
+    } else {
+      await printText(io, `active profile: ${name}`)
+    }
+    return 0
+  }
+
+  if (subcommand === 'show') {
+    if (parsed.positionals.length > 3) {
+      throw new CliUsageError('Unexpected positional arguments')
+    }
+    const name = parsed.positionals[2] ?? (await getActiveProfileName({ baseDir: options.profileBaseDir }))
+    if (!name) {
+      throw new CliUsageError('No profile name provided and no active profile is set')
+    }
+    const profile = await loadProfile(name, { baseDir: options.profileBaseDir })
+    if (hasFlag(parsed, 'json')) {
+      await printJson(io, profile)
+    } else {
+      await printText(
+        io,
+        [
+          `profile: ${profile.name}`,
+          `root type: ${profile.rootType}`,
+          `recoverable: ${profile.recoverable ? 'yes' : 'no'}`,
+          `master npub: ${profile.masterNpub}`,
+          `saved at: ${profile.savedAt}`,
+        ].join('\n'),
+      )
+    }
+    return 0
+  }
+
+  if (subcommand === 'remove') {
+    const name = parsed.positionals[2]
+    if (!name) {
+      throw new CliUsageError('profile remove requires a profile name')
+    }
+    ensureNoExtraPositionals(parsed, 3)
+    await removeProfile(name, { baseDir: options.profileBaseDir })
+    if (hasFlag(parsed, 'json')) {
+      await printJson(io, { removed: name })
+    } else {
+      await printText(io, `removed profile: ${name}`)
+    }
+    return 0
+  }
+
+  throw new CliUsageError(`Unknown profile subcommand "${subcommand ?? ''}"`)
+}
+
+async function handleInspect(parsed, io, libraries, options) {
+  const subcommand = parsed.positionals[1]
+  if (subcommand === 'path') {
+    const rawPath = parsed.positionals[2]
+    if (!rawPath) {
+      throw new CliUsageError('inspect path requires a path argument')
+    }
+    const segments = parsePath(rawPath)
+    const payload = {
+      path: normalizePathSegments(segments),
+      segments,
+      deterministic: true,
+    }
+    if (hasFlag(parsed, 'json')) {
+      await printJson(io, payload)
+    } else {
+      await printText(
+        io,
+        [
+          `path: ${payload.path}`,
+          'segments:',
+          ...segments.map((segment, index) => `  ${index + 1}. ${segment.name} @ ${segment.requestedIndex}`),
+          'deterministic: yes',
+        ].join('\n'),
+      )
+    }
+    return 0
+  }
+
+  if (subcommand === 'root') {
+    ensureNoExtraPositionals(parsed, 2)
+    const rootSource = await resolveRootSource(parsed, io, libraries, {
+      profileBaseDir: options.profileBaseDir,
+      allowImplicitProfile: true,
+    })
+    const summary = await describeRoot(libraries, rootSource.descriptor)
+    const payload = { ...summary, profile: rootSource.profileName, source: rootSource.source }
+    if (hasFlag(parsed, 'json')) {
+      await printJson(io, payload)
+    } else {
+      await printText(
+        io,
+        formatRootSummary(summary, { profileName: rootSource.profileName, source: rootSource.source }),
+      )
+    }
+    return 0
+  }
+
+  throw new CliUsageError(`Unknown inspect subcommand "${subcommand ?? ''}"`)
+}
+
+async function handleExplain(parsed, io) {
+  const topic = parsed.positionals[1]
+  if (!topic) {
+    throw new CliUsageError('Explain topic is required')
+  }
+  ensureNoExtraPositionals(parsed, 2)
+  await printText(io, explainTopic(topic))
+  return 0
+}
+
+export async function runCli(argv, io = nodeIo, options = {}) {
+  const libraries = await loadDependencies()
+
+  try {
+    const parsed = parseArgs(argv)
+    if (hasFlag(parsed, 'help') || parsed.positionals.length === 0) {
+      await printText(io, HELP_TEXT)
+      return 0
+    }
+
+    const command = parsed.positionals[0]
+    if (command === 'root') return await handleRoot(parsed, io, libraries, options)
+    if (command === 'derive') return await handleDerive(parsed, io, libraries, options)
+    if (command === 'export') return await handleExport(parsed, io, libraries, options)
+    if (command === 'prove') return await handleProve(parsed, io, libraries, options)
+    if (command === 'verify') return await handleVerify(parsed, io, libraries)
+    if (command === 'shamir') return await handleShamir(parsed, io, libraries, options)
+    if (command === 'profile') return await handleProfile(parsed, io, libraries, options)
+    if (command === 'inspect') return await handleInspect(parsed, io, libraries, options)
+    if (command === 'explain') return await handleExplain(parsed, io)
+
+    throw new CliUsageError(`Unknown command "${command}"`)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    await io.stderr(`Error: ${message}\n`)
+    return 1
+  }
+}

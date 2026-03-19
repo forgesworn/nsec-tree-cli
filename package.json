@@ -1,0 +1,29 @@
+{
+  "name": "nsec-tree-cli",
+  "version": "0.0.0-development",
+  "description": "Offline-first CLI for hierarchical Nostr identities",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "bin": {
+    "nsec-tree": "./bin/nsec-tree.js"
+  },
+  "scripts": {
+    "start": "node ./bin/nsec-tree.js",
+    "help": "node ./bin/nsec-tree.js --help",
+    "test": "node --test"
+  },
+  "keywords": [
+    "nostr",
+    "nsec",
+    "npub",
+    "cli",
+    "offline",
+    "identity",
+    "privacy",
+    "shamir"
+  ],
+  "license": "MIT",
+  "private": true
+}
