@@ -1,86 +1,161 @@
-# nsec-tree-cli
+# nsec-tree
 
-Offline-first developer tooling for hierarchical Nostr identity.
-
-This repository is the command-line application layer for:
-
-- `nsec-tree` — root creation, deterministic derivation, export, proofs
-- `shamir-words` — human-friendly Shamir splitting and recovery
-
-The goal is to make the `nsec-tree` model feel obvious, useful, and scriptable
-in a few commands — even with no network access.
-
-## Why its own project?
-
-The CLI has different responsibilities from the libraries:
-
-- command parsing
-- profile storage
-- TTY warnings
-- file I/O
-- human-readable output
-- JSON output for scripts
-- future UX features like QR or recovery helpers
-
-Keeping the CLI separate lets:
-
-- `nsec-tree` stay a focused library
-- `shamir-words` stay a focused library
-- `nsec-tree-cli` iterate quickly on developer UX
-
-## Current status
-
-This repo now contains the actual CLI implementation alongside the product docs.
-The command surface is defined in `CLI-SPEC.md`.
-
-## Planned command groups
-
-- `nsec-tree root`
-- `nsec-tree derive`
-- `nsec-tree export`
-- `nsec-tree prove`
-- `nsec-tree verify`
-- `nsec-tree shamir`
-- `nsec-tree profile`
-- `nsec-tree inspect`
-- `nsec-tree explain`
-
-## Local development
-
-```bash
-node ./bin/nsec-tree.js --help
-node --test
+```
+npx nsec-tree root create
 ```
 
-The CLI resolves dependencies in this order:
+One root secret. Unlimited Nostr identities. Fully offline.
 
-- installed packages (`nsec-tree`, `@forgesworn/shamir-words`)
-- local sibling workspaces in `../nsec-tree` and `../shamir-words`
+`nsec-tree` is a command-line tool for **hierarchical Nostr identity management**. It lets you derive as many independent keypairs as you need from a single root secret — like a locksmith cutting unique keys from one master blank. Every derived identity has its own npub and nsec, completely unlinkable to each other, yet all traceable back to your root when you choose to prove it. The entire tool works offline. Your root secret never touches a network.
 
-That makes it usable immediately in this multi-repo workspace while still
-matching the future published package layout.
+## See it in action
 
-## First wow flow
+**Create a root identity** — generates a BIP-39 mnemonic and your master npub. Write down the mnemonic; it's your recovery path.
 
-```bash
-nsec-tree root create
-nsec-tree derive path personal
-nsec-tree derive path anon/forum-burner
-nsec-tree export nsec anon/forum-burner
-nsec-tree prove private anon/forum-burner
+```
+$ nsec-tree root create
+
+  root type     mnemonic-backed
+  recoverable   yes
+  master npub   npub1wk7lycqxj5x05thzl59fszlhcmpxe4ya045662skh8elk8zy6rzs6r7hle
+
+  mnemonic      misery robust expire sand reflect stove life
+                hold patch electric vessel rebuild
+
+  Store this mnemonic offline. It cannot be recovered.
 ```
 
-This is the core story the CLI should make obvious:
+**Derive a purpose-built identity** — slash-separated paths create a tree. Here, `personal` is a category and `forum-burner` is a leaf identity.
 
-- one root
-- many unlinkable identities
-- optional continuity proofs
-- fully offline-capable workflows
+```
+$ nsec-tree derive path personal/forum-burner --mnemonic "abandon ... about"
 
-## Planning docs
+  root
+     └─ personal@0          npub1nleq...n47ps
+        └─ forum-burner@0   npub1fakn...kym592  (leaf)
+```
 
-- `MISSION.md`
-- `ARCHITECTURE.md`
-- `CLI-SPEC.md`
-- `ROADMAP.md`
-- `TODO.md`
+**Export the private key** — when you need to load the derived identity into a Nostr client.
+
+```
+$ nsec-tree export nsec personal/forum-burner --mnemonic "abandon ... about"
+
+  path          personal@0/forum-burner@0
+  nsec          nsec1gpd5p2chjuqc9jr72hk6sj662x85v23rzv283wr99cuc0n2068sscuu5wu
+
+  This is a private key. Store it securely.
+```
+
+**Prove two identities share a root** — a cryptographic proof that your forum-burner belongs to the same root as your main identity, without revealing the derivation path or the root secret itself.
+
+```
+$ nsec-tree prove private personal/forum-burner --mnemonic "abandon ... about"
+
+  proof type    private
+  master pubkey 3eb14b...8d656
+  child pubkey  4f6d38...f61f26
+  attestation   nsec-tree:own:3eb14b...8d656:4f6d38...f61f26
+  signature     e3086d...56be4
+
+  This proof shows shared root ownership
+  without revealing how the child was derived.
+```
+
+**Verify a proof** — anyone can check it. Pipe the JSON proof straight in.
+
+```
+$ nsec-tree prove private personal/forum-burner --json | nsec-tree verify proof --stdin
+
+  ✓ Proof is valid
+
+  proof type    private
+  master pubkey 3eb14b...8d656
+  child pubkey  4f6d38...f61f26
+```
+
+## Why hierarchical identity?
+
+Most Nostr users have one key. One npub, one nsec, one identity everywhere. That works until it doesn't — you want a throwaway for a forum, a separate identity for a project, a pseudonym that can't be linked back to your main account.
+
+You could generate independent keys, but then you lose the thread. If one identity gets compromised or you need to prove they're related, you're stuck.
+
+Hierarchical derivation solves this. One root produces a tree of identities. Each branch is cryptographically independent — different keys, no visible link. But because they all derive from the same root, you can selectively prove ownership when you choose to. Think of it as compartmentalised identity with an optional escape hatch.
+
+## Fully offline
+
+`nsec-tree` makes zero network calls. No DNS lookups, no TLS handshakes, no relay connections, no telemetry. Every operation — root creation, derivation, export, proofs, Shamir splitting — runs entirely on your machine.
+
+This means it works on air-gapped hardware. It means your root mnemonic never leaves the device running the command. And it means you can verify exactly what the tool does, because there is no server-side component to trust.
+
+## What can you do?
+
+| Command group | What it does |
+|---------------|-------------|
+| `root`        | Create, restore, or import a root identity (mnemonic or existing nsec) |
+| `derive`      | Derive child identities at any path in your tree |
+| `export`      | Extract npub, nsec, or full identity bundles for derived keys |
+| `prove`       | Generate cryptographic proofs linking a child to its root |
+| `verify`      | Verify a proof without needing the root secret |
+| `shamir`      | Split your mnemonic into shares; recover from a threshold of them |
+| `profile`     | Save and switch between named root profiles locally |
+| `inspect`     | Examine paths and root metadata without deriving keys |
+| `explain`     | Five built-in mini-tutorials on the concepts behind the tool |
+
+Every command supports `--json` for scripting and `--quiet` for pipeline use.
+
+## Install
+
+Try it without installing:
+
+```bash
+npx nsec-tree root create
+```
+
+Install globally to keep it:
+
+```bash
+npm install -g nsec-tree-cli
+```
+
+Requires Node.js 22 or later.
+
+## Learn from the CLI itself
+
+The `explain` command has five topics that teach the concepts as you go:
+
+```
+nsec-tree explain model       # What is nsec-tree? The mental model.
+nsec-tree explain proofs      # How ownership proofs work.
+nsec-tree explain recovery    # Mnemonics, Shamir, and backup strategies.
+nsec-tree explain paths       # How derivation paths and indices work.
+nsec-tree explain offline     # Why offline-first matters for key management.
+```
+
+No need to leave the terminal to understand what you're doing.
+
+## JSON output for scripts
+
+Every command supports `--json` for machine-readable output:
+
+```
+$ nsec-tree root create --json
+{
+  "rootType": "mnemonic-backed",
+  "recoverable": true,
+  "masterNpub": "npub139ps...vexeg",
+  "mnemonic": "educate bitter aspect nerve step three knife clutch lake auction accident decide"
+}
+```
+
+Pipe derivation into proof generation, feed proofs into verification, split mnemonics and recover them — all scriptable.
+
+## Built on
+
+- [`nsec-tree`](https://www.npmjs.com/package/nsec-tree) — the derivation and proof library
+- [`@forgesworn/shamir-words`](https://www.npmjs.com/package/@forgesworn/shamir-words) — human-friendly Shamir secret sharing with BIP-39 word encoding
+
+## Licence
+
+MIT
+
+A NIP proposal for hierarchical Nostr identity is in progress.
