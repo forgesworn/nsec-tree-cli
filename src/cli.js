@@ -506,6 +506,10 @@ async function handleRoot(parsed, io, libraries, options, fmt) {
     const caps = ['derive', 'export', 'prove']
     if (summary.recoverable) caps.push('phrase-backup', 'shamir')
     lines.push(fmt.labelValue('capabilities', caps.join(', ')))
+    lines.push('', fmt.nextSteps([
+      options.cmd('derive path personal'),
+      options.cmd('explain model'),
+    ]))
     await printText(io, fmt.section(lines))
     return 0
   }
@@ -573,8 +577,12 @@ async function handleDerive(parsed, io, libraries, options, fmt) {
       '',
       fmt.renderTree(result.segments),
       '',
-      `  ${fmt.c.dim}No secret output. Use ${fmt.c.reset}${fmt.c.cyan}${options.cmd(`export nsec ${parsed.positionals[2]}`)}${fmt.c.reset}${fmt.c.dim} to extract the private key.${fmt.c.reset}`,
     ]
+    const pathArg = parsed.positionals[2]
+    lines.push('', fmt.nextSteps([
+      options.cmd(`export nsec ${pathArg}`),
+      options.cmd(`prove private ${pathArg}`),
+    ]))
     await printText(io, fmt.section(lines))
     return 0
   })
@@ -598,6 +606,11 @@ async function handleExport(parsed, io, libraries, options, fmt) {
         const lines = [
           fmt.labelValue('path', result.normalizedPath),
           fmt.labelValue('npub', result.identity.npub),
+          '',
+          fmt.nextSteps([
+            options.cmd(`export nsec ${parsed.positionals[2]}`),
+            options.cmd(`prove private ${parsed.positionals[2]}`),
+          ]),
         ]
         await printText(io, fmt.section(lines))
       }
@@ -623,6 +636,10 @@ async function handleExport(parsed, io, libraries, options, fmt) {
           fmt.labelValue('nsec', result.identity.nsec),
           '',
           fmt.warning('This is a private key. Store it securely.'),
+          '',
+          fmt.nextSteps([
+            options.cmd(`prove private ${parsed.positionals[2]}`),
+          ]),
         ]
         await printText(io, fmt.section(lines))
       }
@@ -645,6 +662,10 @@ async function handleExport(parsed, io, libraries, options, fmt) {
         fmt.labelValue('public key', Buffer.from(result.identity.publicKey).toString('hex')),
         '',
         `  ${fmt.c.dim}This child is a standalone Nostr identity.${fmt.c.reset}`,
+        '',
+        fmt.nextSteps([
+          options.cmd(`prove private ${parsed.positionals[2]}`),
+        ]),
       ]
       await printText(io, fmt.section(lines))
     }
@@ -684,6 +705,9 @@ async function handleProve(parsed, io, libraries, options, fmt) {
         ? 'This proof shows shared root ownership\n  without revealing how the child was derived.'
         : 'This proof reveals the full derivation path.\n  Anyone can verify the exact relationship.'
       lines.push('', `  ${fmt.c.dim}${explanation}${fmt.c.reset}`)
+      lines.push('', fmt.nextSteps([
+        options.cmd(`prove ${subcommand} ${parsed.positionals[2]} --json | ${options.cmd('verify proof --stdin')}`),
+      ]))
       await printText(io, fmt.section(lines))
     }
     return 0
@@ -817,7 +841,14 @@ async function handleShamir(parsed, io, libraries, options, fmt) {
         for (const share of payload) {
           lines.push(fmt.labelValue(`share ${share.index}`, fmt.wrapWords(share.phrase)))
         }
-        lines.push('', fmt.warning(`Store each share separately. Any ${threshold} of ${shares} can recover the mnemonic.`))
+        lines.push(
+          '',
+          fmt.warning(`Store each share separately. Any ${threshold} of ${shares} can recover the mnemonic.`),
+          '',
+          fmt.nextSteps([
+            options.cmd('explain recovery'),
+          ]),
+        )
         await printText(io, fmt.section(lines))
       }
       return 0
@@ -874,6 +905,10 @@ async function handleShamir(parsed, io, libraries, options, fmt) {
           fmt.labelValue('mnemonic', fmt.wrapWords(mnemonic)),
           '',
           fmt.warning('Store this mnemonic offline. It cannot be recovered again without shares.'),
+          '',
+          `  ${fmt.c.dim}Save this root as a profile (copy and paste):${fmt.c.reset}`,
+          '',
+          `    ${fmt.c.cyan}${options.cmd(`profile save main --mnemonic "${mnemonic}" --use`)}${fmt.c.reset}`,
         ]
         await printText(io, fmt.section(lines))
       }
@@ -912,6 +947,11 @@ async function handleProfile(parsed, io, libraries, options, fmt) {
       const lines = [
         fmt.labelValue('saved profile', profile.name),
         fmt.labelValue('master npub', profile.masterNpub),
+        '',
+        fmt.nextSteps([
+          options.cmd('derive path personal'),
+          options.cmd('export npub personal'),
+        ]),
       ]
       await printText(io, fmt.section(lines))
     }
@@ -924,14 +964,26 @@ async function handleProfile(parsed, io, libraries, options, fmt) {
     if (hasFlag(parsed, 'json')) {
       await printJson(io, profiles)
     } else if (profiles.length === 0) {
-      await printText(io, `  ${fmt.c.dim}No profiles saved yet.${fmt.c.reset}`)
+      const lines = [
+        `  ${fmt.c.dim}No profiles saved yet.${fmt.c.reset}`,
+        '',
+        fmt.nextSteps([
+          options.cmd('root create --name main'),
+        ]),
+      ]
+      await printText(io, fmt.section(lines))
     } else {
-      const lines = profiles.map(p => {
+      const tableLines = profiles.map(p => {
         const prefix = p.active ? `${fmt.c.green}*${fmt.c.reset} ` : '  '
         const recovery = p.recoverable ? 'recoverable' : 'no recovery'
         return `  ${prefix}${fmt.c.bold}${p.name.padEnd(12)}${fmt.c.reset} ${p.rootType.padEnd(18)} ${fmt.c.dim}${recovery.padEnd(14)}${fmt.c.reset} ${fmt.c.cyan}${p.masterNpub}${fmt.c.reset}`
       })
-      await printText(io, lines.join('\n'))
+      const hasActive = profiles.some(p => p.active)
+      const hints = hasActive
+        ? [options.cmd('derive path personal')]
+        : [options.cmd(`profile use ${profiles[0].name}`)]
+      tableLines.push('', fmt.nextSteps(hints))
+      await printText(io, tableLines.join('\n'))
     }
     return 0
   }
@@ -946,7 +998,15 @@ async function handleProfile(parsed, io, libraries, options, fmt) {
     if (hasFlag(parsed, 'json')) {
       await printJson(io, { activeProfile: name })
     } else {
-      await printText(io, fmt.labelValue('active profile', name))
+      const lines = [
+        fmt.labelValue('active profile', name),
+        '',
+        fmt.nextSteps([
+          options.cmd('derive path personal'),
+          options.cmd('root inspect'),
+        ]),
+      ]
+      await printText(io, fmt.section(lines))
     }
     return 0
   }
@@ -969,6 +1029,11 @@ async function handleProfile(parsed, io, libraries, options, fmt) {
         fmt.labelValue('recoverable', profile.recoverable ? 'yes' : 'no'),
         fmt.labelValue('master npub', profile.masterNpub),
         fmt.labelValue('saved at', profile.savedAt),
+        '',
+        fmt.nextSteps([
+          options.cmd('derive path personal'),
+          options.cmd('profile list'),
+        ]),
       ]
       await printText(io, fmt.section(lines))
     }
@@ -1015,6 +1080,10 @@ async function handleInspect(parsed, io, libraries, options, fmt) {
         '',
         `  ${fmt.c.dim}segments:${fmt.c.reset}`,
         ...segments.map((seg, i) => `    ${fmt.c.dim}${i + 1}.${fmt.c.reset} ${fmt.c.bold}${seg.name}${fmt.c.reset} ${fmt.c.dim}@ ${seg.requestedIndex}${fmt.c.reset}`),
+        '',
+        fmt.nextSteps([
+          options.cmd(`derive path ${rawPath}`),
+        ]),
       ]
       await printText(io, fmt.section(lines))
     }
