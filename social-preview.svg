@@ -1,0 +1,333 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640">
+  <defs>
+    <linearGradient id="amber" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#fbbf24"/>
+    </linearGradient>
+    <linearGradient id="amberDark" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#d97706"/>
+      <stop offset="100%" stop-color="#f59e0b"/>
+    </linearGradient>
+    <linearGradient id="amberLight" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#fbbf24"/>
+      <stop offset="100%" stop-color="#fcd34d"/>
+    </linearGradient>
+    <linearGradient id="steel" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#475569"/>
+      <stop offset="100%" stop-color="#334155"/>
+    </linearGradient>
+    <linearGradient id="steelLight" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#64748b"/>
+      <stop offset="100%" stop-color="#475569"/>
+    </linearGradient>
+    <linearGradient id="branchLeft" x1="100%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%" stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#fbbf24" stop-opacity="0.7"/>
+    </linearGradient>
+    <linearGradient id="branchRight" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#fbbf24" stop-opacity="0.7"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="subtleGlow">
+      <feGaussianBlur stdDeviation="2" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1280" height="640" fill="#0f172a"/>
+
+  <!-- Hex grid background pattern -->
+  <!-- Row 1 (top, sparse) -->
+  <polygon points="20,10 40,0 60,10 60,30 40,40 20,30" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.18"/>
+  <polygon points="100,10 120,0 140,10 140,30 120,40 100,30" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.18"/>
+  <polygon points="180,10 200,0 220,10 220,30 200,40 180,30" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.18"/>
+  <polygon points="260,10 280,0 300,10 300,30 280,40 260,30" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.18"/>
+  <polygon points="340,10 360,0 380,10 380,30 360,40 340,30" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.18"/>
+  <polygon points="420,10 440,0 460,10 460,30 440,40 420,30" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.18"/>
+  <polygon points="500,10 520,0 540,10 540,30 520,40 500,30" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.18"/>
+  <polygon points="660,10 680,0 700,10 700,30 680,40 660,30" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.18"/>
+  <polygon points="740,10 760,0 780,10 780,30 760,40 740,30" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.18"/>
+  <polygon points="820,10 840,0 860,10 860,30 840,40 820,30" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.18"/>
+  <polygon points="900,10 920,0 940,10 940,30 920,40 900,30" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.18"/>
+  <polygon points="980,10 1000,0 1020,10 1020,30 1000,40 980,30" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.18"/>
+  <polygon points="1060,10 1080,0 1100,10 1100,30 1080,40 1060,30" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.18"/>
+  <polygon points="1140,10 1160,0 1180,10 1180,30 1160,40 1140,30" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.18"/>
+  <polygon points="1220,10 1240,0 1260,10 1260,30 1240,40 1220,30" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.18"/>
+
+  <!-- Row 1b (offset) -->
+  <polygon points="60,30 80,20 100,30 100,50 80,60 60,50" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.15"/>
+  <polygon points="140,30 160,20 180,30 180,50 160,60 140,50" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.15"/>
+  <polygon points="300,30 320,20 340,30 340,50 320,60 300,50" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.15"/>
+  <polygon points="460,30 480,20 500,30 500,50 480,60 460,50" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.15"/>
+  <polygon points="700,30 720,20 740,30 740,50 720,60 700,50" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.15"/>
+  <polygon points="860,30 880,20 900,30 900,50 880,60 860,50" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.15"/>
+  <polygon points="1020,30 1040,20 1060,30 1060,50 1040,60 1020,50" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.15"/>
+  <polygon points="1180,30 1200,20 1220,30 1220,50 1200,60 1180,50" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.15"/>
+
+  <!-- Row 2 -->
+  <polygon points="20,70 40,60 60,70 60,90 40,100 20,90" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.2"/>
+  <polygon points="100,70 120,60 140,70 140,90 120,100 100,90" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.2"/>
+  <polygon points="180,70 200,60 220,70 220,90 200,100 180,90" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.2"/>
+  <polygon points="260,70 280,60 300,70 300,90 280,100 260,90" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.2"/>
+  <polygon points="340,70 360,60 380,70 380,90 360,100 340,90" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.2"/>
+  <polygon points="420,70 440,60 460,70 460,90 440,100 420,90" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.2"/>
+  <polygon points="500,70 520,60 540,70 540,90 520,100 500,90" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.2"/>
+  <polygon points="660,70 680,60 700,70 700,90 680,100 660,90" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.2"/>
+  <polygon points="740,70 760,60 780,70 780,90 760,100 740,90" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.2"/>
+  <polygon points="820,70 840,60 860,70 860,90 840,100 820,90" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.2"/>
+  <polygon points="900,70 920,60 940,70 940,90 920,100 900,90" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.2"/>
+  <polygon points="980,70 1000,60 1020,70 1020,90 1000,100 980,90" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.2"/>
+  <polygon points="1060,70 1080,60 1100,70 1100,90 1080,100 1060,90" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.2"/>
+  <polygon points="1140,70 1160,60 1180,70 1180,90 1160,100 1140,90" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.2"/>
+  <polygon points="1220,70 1240,60 1260,70 1260,90 1240,100 1220,90" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.2"/>
+
+  <!-- Row 2b (offset) -->
+  <polygon points="60,90 80,80 100,90 100,110 80,120 60,110" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.18"/>
+  <polygon points="220,90 240,80 260,90 260,110 240,120 220,110" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.18"/>
+  <polygon points="380,90 400,80 420,90 420,110 400,120 380,110" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.18"/>
+  <polygon points="620,90 640,80 660,90 660,110 640,120 620,110" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.18"/>
+  <polygon points="780,90 800,80 820,90 820,110 800,120 780,110" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.18"/>
+  <polygon points="940,90 960,80 980,90 980,110 960,120 940,110" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.18"/>
+  <polygon points="1100,90 1120,80 1140,90 1140,110 1120,120 1100,110" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.18"/>
+
+  <!-- Row 3 -->
+  <polygon points="20,130 40,120 60,130 60,150 40,160 20,150" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.22"/>
+  <polygon points="100,130 120,120 140,130 140,150 120,160 100,150" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.22"/>
+  <polygon points="260,130 280,120 300,130 300,150 280,160 260,150" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.22"/>
+  <polygon points="420,130 440,120 460,130 460,150 440,160 420,150" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.22"/>
+  <polygon points="660,130 680,120 700,130 700,150 680,160 660,150" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.22"/>
+  <polygon points="820,130 840,120 860,130 860,150 840,160 820,150" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.22"/>
+  <polygon points="980,130 1000,120 1020,130 1020,150 1000,160 980,150" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.22"/>
+  <polygon points="1140,130 1160,120 1180,130 1180,150 1160,160 1140,150" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.22"/>
+
+  <!-- Row 3b offset -->
+  <polygon points="60,150 80,140 100,150 100,170 80,180 60,170" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.2"/>
+  <polygon points="340,150 360,140 380,150 380,170 360,180 340,170" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.2"/>
+  <polygon points="620,150 640,140 660,150 660,170 640,180 620,170" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.2"/>
+  <polygon points="900,150 920,140 940,150 940,170 920,180 900,170" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.2"/>
+  <polygon points="1180,150 1200,140 1220,150 1220,170 1200,180 1180,170" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.2"/>
+
+  <!-- Row 4 -->
+  <polygon points="20,190 40,180 60,190 60,210 40,220 20,210" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.25"/>
+  <polygon points="180,190 200,180 220,190 220,210 200,220 180,210" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.25"/>
+  <polygon points="420,190 440,180 460,190 460,210 440,220 420,210" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.25"/>
+  <polygon points="700,190 720,180 740,190 740,210 720,220 700,210" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.25"/>
+  <polygon points="860,190 880,180 900,190 900,210 880,220 860,210" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.25"/>
+  <polygon points="1060,190 1080,180 1100,190 1100,210 1080,220 1060,210" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.25"/>
+  <polygon points="1260,190 1280,180 1280,210 1260,210" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.25"/>
+
+  <!-- Row 4b offset -->
+  <polygon points="100,210 120,200 140,210 140,230 120,240 100,230" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.22"/>
+  <polygon points="500,210 520,200 540,210 540,230 520,240 500,230" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.22"/>
+  <polygon points="780,210 800,200 820,210 820,230 800,240 780,230" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.22"/>
+  <polygon points="1140,210 1160,200 1180,210 1180,230 1160,240 1140,230" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.22"/>
+
+  <!-- Row 5 (getting sparser) -->
+  <polygon points="60,250 80,240 100,250 100,270 80,280 60,270" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.28"/>
+  <polygon points="300,250 320,240 340,250 340,270 320,280 300,270" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.28"/>
+  <polygon points="620,250 640,240 660,250 660,270 640,280 620,270" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.28"/>
+  <polygon points="900,250 920,240 940,250 940,270 920,280 900,270" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.28"/>
+  <polygon points="1180,250 1200,240 1220,250 1220,270 1200,280 1180,270" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.28"/>
+
+  <!-- Row 5b -->
+  <polygon points="180,270 200,260 220,270 220,290 200,300 180,290" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.25"/>
+  <polygon points="460,270 480,260 500,270 500,290 480,300 460,290" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.25"/>
+  <polygon points="740,270 760,260 780,270 780,290 760,300 740,290" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.25"/>
+  <polygon points="1060,270 1080,260 1100,270 1100,290 1080,300 1060,290" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.25"/>
+
+  <!-- Row 6 (sparse) -->
+  <polygon points="20,330 40,320 60,330 60,350 40,360 20,350" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.18"/>
+  <polygon points="340,330 360,320 380,330 380,350 360,360 340,350" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.18"/>
+  <polygon points="700,330 720,320 740,330 740,350 720,360 700,350" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.18"/>
+  <polygon points="1020,330 1040,320 1060,330 1060,350 1040,360 1020,350" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.18"/>
+
+  <!-- Row 7 (very sparse) -->
+  <polygon points="160,390 180,380 200,390 200,410 180,420 160,410" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.12"/>
+  <polygon points="500,390 520,380 540,390 540,410 520,420 500,410" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.12"/>
+  <polygon points="860,390 880,380 900,390 900,410 880,420 860,410" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.12"/>
+  <polygon points="1200,390 1220,380 1240,390 1240,410 1220,420 1200,410" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.12"/>
+
+  <!-- Row 8 (minimal, bottom) -->
+  <polygon points="60,450 80,440 100,450 100,470 80,480 60,470" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.08"/>
+  <polygon points="400,450 420,440 440,450 440,470 420,480 400,470" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.08"/>
+  <polygon points="780,450 800,440 820,450 820,470 800,480 780,470" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.08"/>
+  <polygon points="1140,450 1160,440 1180,450 1180,470 1160,480 1140,470" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.08"/>
+
+  <!-- ============================================================ -->
+  <!-- LEFT HALF: KEY TREE ILLUSTRATION                            -->
+  <!-- Root at bottom (~y=490), leaves at top (~y=175)            -->
+  <!-- ============================================================ -->
+
+  <!-- Tree trunk / stem from root -->
+  <line x1="320" y1="465" x2="320" y2="390" stroke="url(#amber)" stroke-width="3.5" stroke-linecap="round" opacity="0.9"/>
+
+  <!-- Main branch: left branch from trunk top to left-mid node -->
+  <line x1="320" y1="390" x2="210" y2="300" stroke="url(#branchLeft)" stroke-width="3.5" stroke-linecap="round" opacity="0.85"/>
+  <!-- Main branch: right branch from trunk top to right-mid node -->
+  <line x1="320" y1="390" x2="430" y2="300" stroke="url(#branchRight)" stroke-width="3.5" stroke-linecap="round" opacity="0.85"/>
+
+  <!-- Sub-branches left side -->
+  <line x1="210" y1="300" x2="155" y2="210" stroke="#fbbf24" stroke-width="3" stroke-linecap="round" opacity="0.75"/>
+  <line x1="210" y1="300" x2="265" y2="210" stroke="#fbbf24" stroke-width="3" stroke-linecap="round" opacity="0.75"/>
+
+  <!-- Sub-branches right side -->
+  <line x1="430" y1="300" x2="375" y2="210" stroke="#fbbf24" stroke-width="3" stroke-linecap="round" opacity="0.75"/>
+  <line x1="430" y1="300" x2="485" y2="210" stroke="#fbbf24" stroke-width="3" stroke-linecap="round" opacity="0.75"/>
+
+  <!-- Short leaf stems -->
+  <line x1="155" y1="210" x2="155" y2="185" stroke="#fcd34d" stroke-width="2.5" stroke-linecap="round" opacity="0.7"/>
+  <line x1="265" y1="210" x2="265" y2="185" stroke="#fcd34d" stroke-width="2.5" stroke-linecap="round" opacity="0.7"/>
+  <line x1="375" y1="210" x2="375" y2="185" stroke="#fcd34d" stroke-width="2.5" stroke-linecap="round" opacity="0.7"/>
+  <line x1="485" y1="210" x2="485" y2="185" stroke="#fcd34d" stroke-width="2.5" stroke-linecap="round" opacity="0.7"/>
+
+  <!-- Mid-node circles (intermediate branch nodes) -->
+  <circle cx="210" cy="300" r="9" fill="#1e293b" stroke="#f59e0b" stroke-width="2" opacity="0.9"/>
+  <circle cx="210" cy="300" r="5" fill="#f59e0b" opacity="0.8"/>
+  <circle cx="430" cy="300" r="9" fill="#1e293b" stroke="#f59e0b" stroke-width="2" opacity="0.9"/>
+  <circle cx="430" cy="300" r="5" fill="#f59e0b" opacity="0.8"/>
+
+  <!-- Leaf key icons — small key shape at each leaf tip -->
+  <!-- Key: circle (bow) + rect body + teeth notches -->
+
+  <!-- Leaf 1 at (155, 168) -->
+  <g transform="translate(155, 168)" filter="url(#subtleGlow)">
+    <circle cx="0" cy="0" r="10" fill="#1e293b" stroke="#fbbf24" stroke-width="2"/>
+    <circle cx="0" cy="0" r="5" fill="none" stroke="#fbbf24" stroke-width="2"/>
+    <!-- key shaft going down -->
+    <rect x="-1.5" y="8" width="3" height="14" rx="1" fill="#fbbf24"/>
+    <!-- teeth -->
+    <rect x="1.5" y="15" width="4" height="3" rx="0.5" fill="#fbbf24"/>
+    <rect x="1.5" y="19" width="3" height="2.5" rx="0.5" fill="#fbbf24"/>
+  </g>
+
+  <!-- Leaf 2 at (265, 168) -->
+  <g transform="translate(265, 168)" filter="url(#subtleGlow)">
+    <circle cx="0" cy="0" r="10" fill="#1e293b" stroke="#fbbf24" stroke-width="2"/>
+    <circle cx="0" cy="0" r="5" fill="none" stroke="#fbbf24" stroke-width="2"/>
+    <rect x="-1.5" y="8" width="3" height="14" rx="1" fill="#fbbf24"/>
+    <rect x="1.5" y="15" width="4" height="3" rx="0.5" fill="#fbbf24"/>
+    <rect x="1.5" y="19" width="3" height="2.5" rx="0.5" fill="#fbbf24"/>
+  </g>
+
+  <!-- Leaf 3 at (375, 168) -->
+  <g transform="translate(375, 168)" filter="url(#subtleGlow)">
+    <circle cx="0" cy="0" r="10" fill="#1e293b" stroke="#fbbf24" stroke-width="2"/>
+    <circle cx="0" cy="0" r="5" fill="none" stroke="#fbbf24" stroke-width="2"/>
+    <rect x="-1.5" y="8" width="3" height="14" rx="1" fill="#fbbf24"/>
+    <rect x="1.5" y="15" width="4" height="3" rx="0.5" fill="#fbbf24"/>
+    <rect x="1.5" y="19" width="3" height="2.5" rx="0.5" fill="#fbbf24"/>
+  </g>
+
+  <!-- Leaf 4 at (485, 168) -->
+  <g transform="translate(485, 168)" filter="url(#subtleGlow)">
+    <circle cx="0" cy="0" r="10" fill="#1e293b" stroke="#fbbf24" stroke-width="2"/>
+    <circle cx="0" cy="0" r="5" fill="none" stroke="#fbbf24" stroke-width="2"/>
+    <rect x="-1.5" y="8" width="3" height="14" rx="1" fill="#fbbf24"/>
+    <rect x="1.5" y="15" width="4" height="3" rx="0.5" fill="#fbbf24"/>
+    <rect x="1.5" y="19" width="3" height="2.5" rx="0.5" fill="#fbbf24"/>
+  </g>
+
+  <!-- Root node (glowing amber circle with lock icon) -->
+  <g transform="translate(320, 490)" filter="url(#glow)">
+    <!-- outer glow ring -->
+    <circle cx="0" cy="0" r="30" fill="#f59e0b" opacity="0.15"/>
+    <circle cx="0" cy="0" r="24" fill="#1e293b" stroke="url(#amber)" stroke-width="3"/>
+    <!-- lock body -->
+    <rect x="-8" y="-2" width="16" height="12" rx="3" fill="url(#amber)"/>
+    <!-- lock shackle -->
+    <path d="M -5,-2 L -5,-8 Q -5,-14 0,-14 Q 5,-14 5,-8 L 5,-2" fill="none" stroke="#fbbf24" stroke-width="2.5" stroke-linecap="round"/>
+    <!-- keyhole -->
+    <circle cx="0" cy="4" r="2.5" fill="#0f172a"/>
+    <rect x="-1.5" y="4" width="3" height="4" rx="0" fill="#0f172a"/>
+  </g>
+
+  <!-- Subtle label under root -->
+  <text x="320" y="530" text-anchor="middle" font-family="monospace" font-size="11" fill="#64748b" opacity="0.7">root seed</text>
+
+  <!-- Leaf labels -->
+  <text x="155" y="158" text-anchor="middle" font-family="monospace" font-size="10" fill="#64748b" opacity="0.6">m/0/0</text>
+  <text x="265" y="158" text-anchor="middle" font-family="monospace" font-size="10" fill="#64748b" opacity="0.6">m/0/1</text>
+  <text x="375" y="158" text-anchor="middle" font-family="monospace" font-size="10" fill="#64748b" opacity="0.6">m/1/0</text>
+  <text x="485" y="158" text-anchor="middle" font-family="monospace" font-size="10" fill="#64748b" opacity="0.6">m/1/1</text>
+
+  <!-- Connecting dots on mid branches -->
+  <circle cx="155" cy="210" r="6" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5" opacity="0.8"/>
+  <circle cx="265" cy="210" r="6" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5" opacity="0.8"/>
+  <circle cx="375" cy="210" r="6" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5" opacity="0.8"/>
+  <circle cx="485" cy="210" r="6" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5" opacity="0.8"/>
+
+  <!-- ============================================================ -->
+  <!-- DIVIDER                                                      -->
+  <!-- ============================================================ -->
+
+  <!-- Left divider line -->
+  <line x1="580" y1="60" x2="580" y2="295" stroke="#334155" stroke-width="1" opacity="0.5"/>
+  <!-- Right divider line -->
+  <line x1="586" y1="60" x2="586" y2="295" stroke="#334155" stroke-width="1" opacity="0.5"/>
+  <!-- Bottom half lines -->
+  <line x1="580" y1="325" x2="580" y2="600" stroke="#334155" stroke-width="1" opacity="0.5"/>
+  <line x1="586" y1="325" x2="586" y2="600" stroke="#334155" stroke-width="1" opacity="0.5"/>
+
+  <!-- Key icon centred between divider lines at y=310 -->
+  <g transform="translate(583, 310)">
+    <circle cx="0" cy="-6" r="5.5" fill="none" stroke="#64748b" stroke-width="1.5"/>
+    <circle cx="0" cy="-6" r="2.5" fill="none" stroke="#64748b" stroke-width="1.5"/>
+    <rect x="-1" y="-1" width="2" height="10" rx="0.5" fill="#64748b"/>
+    <rect x="1" y="4" width="3" height="2" rx="0.3" fill="#64748b"/>
+    <rect x="1" y="7" width="2.5" height="1.5" rx="0.3" fill="#64748b"/>
+  </g>
+
+  <!-- ============================================================ -->
+  <!-- RIGHT HALF: TEXT                                            -->
+  <!-- ============================================================ -->
+
+  <!-- Title -->
+  <text x="660" y="310" font-family="'Courier New', Courier, monospace" font-size="52" font-weight="bold" fill="#f8fafc" dominant-baseline="middle">nsec-tree</text>
+
+  <!-- Tagline -->
+  <text x="660" y="350" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="18" fill="#94a3b8">one root. many identities. fully offline.</text>
+
+  <!-- Secondary info tags -->
+  <g transform="translate(660, 395)">
+    <!-- Tag: nostr -->
+    <rect x="0" y="0" width="58" height="22" rx="4" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+    <text x="29" y="11" text-anchor="middle" dominant-baseline="middle" font-family="monospace" font-size="11" fill="#64748b">nostr</text>
+    <!-- Tag: bip39 -->
+    <rect x="66" y="0" width="52" height="22" rx="4" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+    <text x="92" y="11" text-anchor="middle" dominant-baseline="middle" font-family="monospace" font-size="11" fill="#64748b">bip39</text>
+    <!-- Tag: shamir -->
+    <rect x="126" y="0" width="62" height="22" rx="4" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+    <text x="157" y="11" text-anchor="middle" dominant-baseline="middle" font-family="monospace" font-size="11" fill="#64748b">shamir</text>
+    <!-- Tag: air-gapped -->
+    <rect x="196" y="0" width="84" height="22" rx="4" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+    <text x="238" y="11" text-anchor="middle" dominant-baseline="middle" font-family="monospace" font-size="11" fill="#64748b">air-gapped</text>
+  </g>
+
+  <!-- Decorative amber accent line under title area -->
+  <rect x="660" y="372" width="180" height="2" rx="1" fill="url(#amber)" opacity="0.4"/>
+
+  <!-- Large decorative background text (watermark style) -->
+  <text x="950" y="500" font-family="monospace" font-size="160" font-weight="bold" fill="#f59e0b" opacity="0.04" text-anchor="middle">🔑</text>
+
+  <!-- ============================================================ -->
+  <!-- TICKER BOTTOM                                               -->
+  <!-- ============================================================ -->
+
+  <!-- Ticker background strip -->
+  <rect x="0" y="610" width="1280" height="30" fill="#94a3b8" opacity="0.06"/>
+
+  <!-- Ticker text -->
+  <text x="640" y="622" text-anchor="middle" dominant-baseline="middle" font-family="'Courier New', Courier, monospace" font-size="12" fill="#94a3b8" opacity="0.06">nostr  nsec  npub  cli  offline  identity  shamir  derivation  proof  key-management  hierarchical  air-gapped  privacy  bip39  cryptography  nostr  nsec  npub  cli  offline  identity  shamir  derivation  proof  key-management  hierarchical  air-gapped  privacy  bip39  cryptography</text>
+
+</svg>
