@@ -419,12 +419,12 @@ async function handleRoot(parsed, io, libraries, options, fmt) {
       fmt.warning('Store this mnemonic offline. It cannot be recovered.'),
     ]
     if (savedProfile) {
-      lines.splice(5, 0, fmt.labelValue('profile', savedProfile.name))
+      lines.splice(5, 0, fmt.labelValue('profile', `${savedProfile.name} (active)`))
       lines.push(
         '',
         fmt.nextSteps([
           options.cmd('derive path personal'),
-          options.cmd('export nsec personal'),
+          options.cmd('derive path work/project-x'),
         ]),
       )
     } else if (options.showHints) {
@@ -1044,6 +1044,9 @@ async function handleProfile(parsed, io, libraries, options, fmt) {
     } else {
       const lines = [
         fmt.labelValue('active profile', name),
+        '',
+        `  ${fmt.c.dim}All commands now use "${name}" automatically.${fmt.c.reset}`,
+        `  ${fmt.c.dim}Or use --profile <name> for a one-off override.${fmt.c.reset}`,
         '',
         fmt.nextSteps([
           options.cmd('derive path personal'),

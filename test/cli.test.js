@@ -309,7 +309,8 @@ describe('contextual next-steps (HATEOAS)', () => {
     )
     assert.equal(exitCode, 0)
     assert.match(io.stdoutBuffer, /derive path personal/, 'should suggest derive path')
-    assert.match(io.stdoutBuffer, /export nsec personal/, 'should suggest export nsec')
+    assert.match(io.stdoutBuffer, /derive path work\/project-x/, 'should show multiple example paths')
+    assert.match(io.stdoutBuffer, /\(active\)/, 'should show profile as active')
     assert.doesNotMatch(io.stdoutBuffer, /profile save/, 'should not show profile save when --name was used')
   })
 

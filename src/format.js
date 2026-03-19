@@ -25,7 +25,7 @@ export function createFormatter({ colour = false } = {}) {
     : { reset: '', bold: '', dim: '', red: '', green: '', yellow: '', cyan: '' }
 
   function labelValue(label, value) {
-    const padded = label.padEnd(LABEL_WIDTH)
+    const padded = label.length >= LABEL_WIDTH ? `${label}  ` : label.padEnd(LABEL_WIDTH)
     return `  ${c.dim}${padded}${c.reset}${c.bold}${value}${c.reset}`
   }
 
