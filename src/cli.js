@@ -23,7 +23,7 @@ class CliUsageError extends Error {
   }
 }
 
-const BOOLEAN_OPTIONS = new Set(['json', 'quiet', 'stdin', 'help', 'force', 'use'])
+const BOOLEAN_OPTIONS = new Set(['json', 'quiet', 'stdin', 'help', 'force', 'use', 'no-hints'])
 const VALUE_OPTIONS = new Set([
   'mnemonic',
   'nsec',
@@ -73,11 +73,21 @@ Usage:
   nsec-tree inspect root [(--mnemonic <phrase> | --nsec <nsec> | --root-file <file> | --stdin | --profile <name>)] [--json]
   nsec-tree explain model|proofs|recovery|paths|offline
 
+Options:
+  --json          Machine-readable JSON output
+  --quiet         Bare values only, no formatting
+  --no-hints      Suppress "Try next" suggestions
+  --help          Show this help text
+
+Environment:
+  NSEC_TREE_NO_HINTS=1    Permanently disable hints
+  NO_COLOR=1              Disable colour output
+
 Examples:
-  nsec-tree root create
-  nsec-tree derive path personal/forum-burner --mnemonic "abandon ... about"
-  nsec-tree export nsec anon/forum-burner --profile personal
-  nsec-tree prove private anon/forum-burner --profile personal
+  nsec-tree root create --name main
+  nsec-tree derive path personal/forum-burner
+  nsec-tree export nsec personal/forum-burner
+  nsec-tree prove private personal/forum-burner
 `
 
 function detectCommandPrefix() {
@@ -417,7 +427,7 @@ async function handleRoot(parsed, io, libraries, options, fmt) {
           options.cmd('export nsec personal'),
         ]),
       )
-    } else {
+    } else if (options.showHints) {
       lines.push(
         '',
         `  ${fmt.c.dim}Save this root as a profile (copy and paste):${fmt.c.reset}`,
@@ -507,10 +517,10 @@ async function handleRoot(parsed, io, libraries, options, fmt) {
     const caps = ['derive', 'export', 'prove']
     if (summary.recoverable) caps.push('phrase-backup', 'shamir')
     lines.push(fmt.labelValue('capabilities', caps.join(', ')))
-    lines.push('', fmt.nextSteps([
-      options.cmd('derive path personal'),
-      options.cmd('explain model'),
-    ]))
+    const inspectHints = [options.cmd('derive path personal')]
+    if (summary.recoverable) inspectHints.push(options.cmd('shamir split --shares 3 --threshold 2'))
+    inspectHints.push(options.cmd('explain model'))
+    lines.push('', fmt.nextSteps(inspectHints))
     await printText(io, fmt.section(lines))
     return 0
   }
@@ -733,7 +743,7 @@ function coerceProof(raw) {
   return raw
 }
 
-async function handleVerify(parsed, io, libraries, fmt) {
+async function handleVerify(parsed, io, libraries, options, fmt) {
   if (parsed.positionals[1] !== 'proof') {
     throw new CliUsageError('Only "verify proof" is supported')
   }
@@ -766,6 +776,9 @@ async function handleVerify(parsed, io, libraries, fmt) {
       ]
       if (proof.purpose !== undefined) lines.push(fmt.labelValue('purpose', proof.purpose))
       if (proof.index !== undefined) lines.push(fmt.labelValue('index', String(proof.index)))
+      lines.push('', fmt.nextSteps([
+        options.cmd('explain proofs'),
+      ]))
       await printText(io, fmt.section(lines))
     } else {
       await printText(io, fmt.failure('Proof is invalid'))
@@ -847,6 +860,7 @@ async function handleShamir(parsed, io, libraries, options, fmt) {
           fmt.warning(`Store each share separately. Any ${threshold} of ${shares} can recover the mnemonic.`),
           '',
           fmt.nextSteps([
+            options.cmd('shamir recover share-1.txt share-2.txt'),
             options.cmd('explain recovery'),
           ]),
         )
@@ -906,10 +920,12 @@ async function handleShamir(parsed, io, libraries, options, fmt) {
           fmt.labelValue('mnemonic', fmt.wrapWords(mnemonic)),
           '',
           fmt.warning('Store this mnemonic offline. It cannot be recovered again without shares.'),
-          '',
-          `  ${fmt.c.dim}Save this root as a profile (copy and paste):${fmt.c.reset}`,
-          '',
-          `    ${fmt.c.cyan}${options.cmd(`profile save main --mnemonic "${mnemonic}" --use`)}${fmt.c.reset}`,
+          ...(options.showHints ? [
+            '',
+            `  ${fmt.c.dim}Save this root as a profile (copy and paste):${fmt.c.reset}`,
+            '',
+            `    ${fmt.c.cyan}${options.cmd(`profile save main --mnemonic "${mnemonic}" --use`)}${fmt.c.reset}`,
+          ] : []),
         ]
         await printText(io, fmt.section(lines))
       }
@@ -1139,10 +1155,14 @@ export async function runCli(argv, io = nodeIo, options = {}) {
   const fmt = createFormatter({ colour: useColour })
   const prefix = io.commandPrefix ?? 'nsec-tree'
   function cmd(args) { return `${prefix} ${args}` }
-  const opts = { ...options, cmd }
 
   try {
     const parsed = parseArgs(argv)
+    const showHints = !hasFlag(parsed, 'no-hints') && !process.env.NSEC_TREE_NO_HINTS
+    if (!showHints) {
+      fmt.nextSteps = () => null
+    }
+    const opts = { ...options, cmd, showHints }
     if (hasFlag(parsed, 'help') || parsed.positionals.length === 0) {
       await printText(io, HELP_TEXT)
       return 0
@@ -1153,7 +1173,7 @@ export async function runCli(argv, io = nodeIo, options = {}) {
     if (command === 'derive') return await handleDerive(parsed, io, libraries, opts, fmt)
     if (command === 'export') return await handleExport(parsed, io, libraries, opts, fmt)
     if (command === 'prove') return await handleProve(parsed, io, libraries, opts, fmt)
-    if (command === 'verify') return await handleVerify(parsed, io, libraries, fmt)
+    if (command === 'verify') return await handleVerify(parsed, io, libraries, opts, fmt)
     if (command === 'shamir') return await handleShamir(parsed, io, libraries, opts, fmt)
     if (command === 'profile') return await handleProfile(parsed, io, libraries, opts, fmt)
     if (command === 'inspect') return await handleInspect(parsed, io, libraries, opts, fmt)
