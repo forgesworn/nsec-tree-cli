@@ -223,3 +223,85 @@ describe('error paths', () => {
     assert.match(io.stderrBuffer, /No root input/)
   })
 })
+
+describe('security regression', () => {
+  it('rejects path traversal in profile names', async () => {
+    const io = new MemoryIo()
+    const exitCode = await runCli(
+      ['profile', 'save', '../../../tmp/evil', '--mnemonic', TEST_MNEMONIC],
+      io,
+    )
+    assert.equal(exitCode, 1)
+    assert.match(io.stderrBuffer, /lowercase/)
+  })
+
+  it('rejects null bytes in path segments', async () => {
+    const io = new MemoryIo()
+    const exitCode = await runCli(
+      ['derive', 'path', 'personal\x00evil', '--mnemonic', TEST_MNEMONIC],
+      io,
+    )
+    assert.equal(exitCode, 1)
+  })
+
+  it('rejects malformed JSON in proof verification', async () => {
+    const io = new MemoryIo('not json at all')
+    const exitCode = await runCli(['verify', 'proof', '--stdin'], io)
+    assert.equal(exitCode, 1)
+    assert.match(io.stderrBuffer, /Invalid proof JSON/)
+  })
+
+  it('rejects empty stdin for proof verification', async () => {
+    const io = new MemoryIo('')
+    const exitCode = await runCli(['verify', 'proof', '--stdin'], io)
+    assert.equal(exitCode, 1)
+  })
+
+  it('rejects --shares 0', async () => {
+    const io = new MemoryIo()
+    const exitCode = await runCli(
+      ['shamir', 'split', '--mnemonic', TEST_MNEMONIC, '--shares', '0', '--threshold', '0'],
+      io,
+    )
+    assert.equal(exitCode, 1)
+    assert.match(io.stderrBuffer, /between 2 and 255/)
+  })
+
+  it('rejects --shares -1', async () => {
+    const io = new MemoryIo()
+    const exitCode = await runCli(
+      ['shamir', 'split', '--mnemonic', TEST_MNEMONIC, '--shares', '-1', '--threshold', '2'],
+      io,
+    )
+    assert.equal(exitCode, 1)
+    assert.match(io.stderrBuffer, /between 2 and 255/)
+  })
+
+  it('rejects --threshold greater than --shares', async () => {
+    const io = new MemoryIo()
+    const exitCode = await runCli(
+      ['shamir', 'split', '--mnemonic', TEST_MNEMONIC, '--shares', '3', '--threshold', '5'],
+      io,
+    )
+    assert.equal(exitCode, 1)
+    assert.match(io.stderrBuffer, /between 2 and 3/)
+  })
+
+  it('profile show --json does not leak root descriptor', async () => {
+    const profileBaseDir = await mkdtemp(join(tmpdir(), 'nsec-tree-cli-'))
+    tempDirs.push(profileBaseDir)
+
+    await runCli(
+      ['profile', 'save', 'test', '--mnemonic', TEST_MNEMONIC, '--use', '--json'],
+      new MemoryIo(),
+      { profileBaseDir },
+    )
+
+    const io = new MemoryIo()
+    await runCli(['profile', 'show', '--json'], io, { profileBaseDir })
+    const payload = JSON.parse(io.stdoutBuffer)
+    assert.equal(payload.root, undefined, 'profile show --json should not include root descriptor')
+    assert.equal(payload.name, 'test')
+    assert.match(payload.masterNpub, /^npub1/)
+  })
+})

@@ -756,7 +756,13 @@ async function handleVerify(parsed, io, libraries, options, fmt) {
   }
 
   const rawText = useStdin ? await io.readStdin() : await readFile(proofFile, 'utf8')
-  const proof = coerceProof(JSON.parse(rawText))
+  let parsed_proof
+  try {
+    parsed_proof = JSON.parse(rawText)
+  } catch {
+    throw new CliUsageError('Invalid proof JSON')
+  }
+  const proof = coerceProof(parsed_proof)
   const valid = libraries.nsecTree.verifyProof(proof)
   const proofType = proof.purpose === undefined ? 'private' : 'full'
 
@@ -803,6 +809,12 @@ async function handleShamir(parsed, io, libraries, options, fmt) {
     const threshold = toNumberOption(parsed, 'threshold')
     if (shares === undefined || threshold === undefined) {
       throw new CliUsageError('shamir split requires --shares and --threshold')
+    }
+    if (shares < 2 || shares > 255) {
+      throw new CliUsageError('--shares must be between 2 and 255')
+    }
+    if (threshold < 2 || threshold > shares) {
+      throw new CliUsageError(`--threshold must be between 2 and ${shares}`)
     }
     const rootSource = await resolveRootSource(parsed, io, libraries, {
       profileBaseDir: options.profileBaseDir,
@@ -921,9 +933,8 @@ async function handleShamir(parsed, io, libraries, options, fmt) {
           fmt.warning('Store this mnemonic offline. It cannot be recovered again without shares.'),
           ...(options.showHints ? [
             '',
-            `  ${fmt.c.dim}Save this root as a profile (copy and paste):${fmt.c.reset}`,
-            '',
-            `    ${fmt.c.cyan}${options.cmd(`profile save main --mnemonic "${mnemonic}" --use`)}${fmt.c.reset}`,
+            `  ${fmt.c.dim}Pipe the mnemonic to save as a profile (avoids shell history):${fmt.c.reset}`,
+            `    ${fmt.c.cyan}echo "<mnemonic>" | ${options.cmd('profile save main --stdin --use')}${fmt.c.reset}`,
           ] : []),
         ]
         await printText(io, fmt.section(lines))
@@ -1039,7 +1050,8 @@ async function handleProfile(parsed, io, libraries, options, fmt) {
     }
     const profile = await loadProfile(name, { baseDir: options.profileBaseDir })
     if (hasFlag(parsed, 'json')) {
-      await printJson(io, profile)
+      const { root: _root, ...safeProfile } = profile
+      await printJson(io, safeProfile)
     } else {
       const lines = [
         fmt.labelValue('profile', profile.name),

@@ -33,18 +33,6 @@ async function ensureDirs(options = {}) {
   await mkdir(getProfilesDir(options), { recursive: true, mode: 0o700 })
 }
 
-async function pathExists(path) {
-  try {
-    await readFile(path, 'utf8')
-    return true
-  } catch (error) {
-    if (error && typeof error === 'object' && error.code === 'ENOENT') {
-      return false
-    }
-    throw error
-  }
-}
-
 export function coerceRootDescriptor(value) {
   if (typeof value !== 'object' || value === null) {
     throw new Error('Root descriptor must be an object')
@@ -101,9 +89,6 @@ export async function saveProfile(libraries, name, descriptor, options = {}) {
   validateProfileName(name)
   await ensureDirs(options)
   const file = getProfileFile(name, options)
-  if (!options.overwrite && (await pathExists(file))) {
-    throw new Error(`Profile "${name}" already exists. Use --force to overwrite.`)
-  }
 
   const metadata = await describeRoot(libraries, descriptor)
   const profile = {
@@ -112,7 +97,19 @@ export async function saveProfile(libraries, name, descriptor, options = {}) {
     ...metadata,
     root: descriptor,
   }
-  await writeFile(file, `${JSON.stringify(profile, null, 2)}\n`, { mode: 0o600 })
+  const content = `${JSON.stringify(profile, null, 2)}\n`
+  if (options.overwrite) {
+    await writeFile(file, content, { mode: 0o600 })
+  } else {
+    try {
+      await writeFile(file, content, { mode: 0o600, flag: 'wx' })
+    } catch (error) {
+      if (error && typeof error === 'object' && error.code === 'EEXIST') {
+        throw new Error(`Profile "${name}" already exists. Use --force to overwrite.`)
+      }
+      throw error
+    }
+  }
   return profile
 }
 

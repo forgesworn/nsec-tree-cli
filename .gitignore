@@ -4,3 +4,11 @@ coverage/
 .DS_Store
 .idea/
 .claude/
+
+# Secrets and key material
+.env
+.env.*
+*.pem
+*.key
+*.nsec
+.nsec-tree/
