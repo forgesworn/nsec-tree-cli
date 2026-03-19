@@ -430,11 +430,11 @@ async function handleRoot(parsed, io, libraries, options, fmt) {
     } else if (options.showHints) {
       lines.push(
         '',
-        `  ${fmt.c.dim}Save this root as a profile (copy and paste):${fmt.c.reset}`,
+        `  ${fmt.c.dim}Save this root as a profile called "main" (copy and paste):${fmt.c.reset}`,
         '',
         `    ${fmt.c.cyan}${options.cmd(`profile save main --mnemonic "${mnemonic}" --use`)}${fmt.c.reset}`,
         '',
-        `  ${fmt.c.dim}Then derive identities (name them anything):${fmt.c.reset}`,
+        `  ${fmt.c.dim}The --use flag makes "main" active, so all commands use it automatically:${fmt.c.reset}`,
         `    ${fmt.c.cyan}${options.cmd('derive path personal')}${fmt.c.reset}`,
         `    ${fmt.c.cyan}${options.cmd('derive path work/project-x')}${fmt.c.reset}`,
       )
