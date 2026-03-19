@@ -27,9 +27,9 @@
 
 ### deps.js simplification
 
-- Primary path: direct imports from npm packages
-- Sibling fallback kept behind try/catch for local dev ergonomics only
-- Remove the multi-candidate bip39 resolution chains — with `@scure/bip39` as a direct dep, it always resolves
+- Primary path: direct imports from npm packages — `import('nsec-tree')`, `import('@forgesworn/shamir-words')`, `import('@scure/bip39')`, and `import('@scure/bip39/wordlists/english.js')`
+- Sibling fallback kept behind try/catch for **local multi-repo development only** — never used in CI. The new CI does `npm ci` which installs the npm packages, so the sibling paths are irrelevant there.
+- Remove the multi-candidate bip39 resolution chains — with `@scure/bip39` as a direct dep, both `@scure/bip39` and `@scure/bip39/wordlists/english.js` always resolve
 
 ---
 
@@ -52,15 +52,15 @@ src/explain.js        — rich explain topic content (mini-tutorials)
 
 ### format.js responsibilities
 
+- **API pattern:** export a `createFormatter({ colour })` factory. The `colour` boolean is passed by cli.js based on `io.isStdoutTty && !process.env.NO_COLOR`. This keeps format.js decoupled from `process.stdout` and testable with `MemoryIo`.
+- **Content width:** fixed at 60 characters. No terminal width detection — keeps output predictable and testable. Mnemonic word-wrap and box width are based on this constant.
 - ANSI colour constants: green, yellow, red, dim, bold, cyan, reset
-- TTY detection: colours only when stdout is a TTY
-- `NO_COLOR` env var support (disable colours when set)
 - Box-drawing: `boxHeader(title)` for framed section headers
-- Tree-drawing: `renderTree(segments)` for derivation path visualisation using `├──`, `└──`
+- Tree-drawing: `renderTree(segments)` for derivation path visualisation using `├─`, `└─`, with proper nesting (child segments are indented under their parent, not rendered as siblings)
 - Label-value formatting: `labelValue(label, value)` with dim labels, bright values
 - Warning banners: `warning(text)` in yellow
 - Next-steps suggestions: `nextSteps(commands)` with dim "Try next:" header
-- Mnemonic wrapping: word-wrap at reasonable width rather than one long line
+- Mnemonic wrapping: word-wrap at the fixed content width
 
 ### explain.js responsibilities
 
@@ -73,6 +73,9 @@ src/explain.js        — rich explain topic content (mini-tutorials)
 
 - All string formatting calls route through format.js
 - Explain handler delegates to explain.js
+- `HELP_TEXT` updated to include new explain topics: `model|proofs|recovery|paths|offline`
+- `derive persona` and `derive account` aliases remain unchanged — they continue to delegate to `derive path`
+- `bin/nsec-tree.js` unchanged — it already delegates to `runCli()`
 - Command dispatch and logic unchanged
 - Net reduction in line count as formatting moves out
 
@@ -80,7 +83,7 @@ src/explain.js        — rich explain topic content (mini-tutorials)
 
 ## 3. CLI Output Design
 
-All formatting applies to human mode only. `--json` and `--quiet` output are unchanged.
+All formatting applies to human mode only. `--json` output is unchanged — valid JSON, stable schema, no ANSI codes. `--quiet` continues to emit bare values only, with no ANSI codes, no box headers, and no suggestions.
 
 ### Design language
 
@@ -117,13 +120,15 @@ All formatting applies to human mode only. `--json` and `--quiet` output are unc
 
 ### derive path
 
+Tree rendering shows actual nesting — children are indented under their parent:
+
 ```
   root type     mnemonic-backed
   path          personal@0 / forum-burner@0
 
   root
-    ├─ personal@0        npub1abc...
-    └─ forum-burner@0    npub1fak...  (leaf)
+    └─ personal@0          npub1abc...
+       └─ forum-burner@0   npub1fak...  (leaf)
 
   No secret output. Use export nsec to extract the private key.
 ```
@@ -166,7 +171,37 @@ All formatting applies to human mode only. `--json` and `--quiet` output are unc
 
 ### shamir split
 
-Box header, share listing with word-wrap, warning banner about secure storage.
+```
+╭─────────────────────────────────────────────╮
+│  Shamir split complete                      │
+╰─────────────────────────────────────────────╯
+
+  shares        3
+  threshold     2
+
+  share 1       abandon ability able about
+                above absent absorb abstract
+  share 2       abandon ability able about
+                above absent absorb abstract
+  share 3       abandon ability able about
+                above absent absorb abstract
+
+  Store each share separately. Any 2 of 3 can
+  recover the mnemonic.
+```
+
+### export identity
+
+```
+  path          personal@0/forum-burner@0
+  purpose       forum-burner
+  index         0
+  npub          npub1fak...
+  nsec          nsec1...
+  public key    9ed3...
+
+  This is a standalone Nostr identity.
+```
 
 ### Error output
 
@@ -248,6 +283,14 @@ Approachable and teaching. Assumes the reader might not know hierarchical identi
 
 Same as existing: `MemoryIo` instances passed to `runCli(argv, io, options)`. `options.profileBaseDir` redirects profile storage to temp dirs. No mocking of libraries. No new test dependencies.
 
+### Test file organisation
+
+Split into focused files:
+- `test/cli.test.js` — command behaviour (happy paths for all command groups)
+- `test/format.test.js` — ANSI/TTY/NO_COLOR, box-drawing, tree rendering
+- `test/errors.test.js` — error paths, validation failures, edge cases
+- `test/profile.test.js` — profile lifecycle integration tests
+
 ### Error path tests
 
 - Unknown command returns exit code 1
@@ -328,6 +371,7 @@ Remove the `FORGESWORN_REPO_TOKEN` secret dependency and sibling repo checkout s
 - Man pages
 - Profile metadata/labels
 - Import/export bundles
+- `--version` flag (add when semantic-release is configured and version is dynamic)
 
 ---
 
