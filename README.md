@@ -86,6 +86,15 @@ You could generate independent keys, but then you lose the thread. If one identi
 
 Hierarchical derivation solves this. One root produces a tree of identities. Each branch is cryptographically independent — different keys, no visible link. But because they all derive from the same root, you can selectively prove ownership when you choose to. Think of it as compartmentalised identity with an optional escape hatch.
 
+## Why prove ownership?
+
+By default, everything in `nsec-tree` is private and perfectly siloed. But sometimes you *want* to inject undeniable truth into a trustless network without doxing your whole identity tree. Linkage proofs enable powerful workflows:
+
+- **Bootstrapping trust:** Launching a new bot or project? Generate a proof linking your high-reputation main account to the new npub so people know it is officially yours.
+- **Secure key rotation:** If your phone is hacked and your daily-driver key is compromised, you can derive a new key from your offline root and post a proof. Your followers know exactly where to migrate.
+- **Voluntary de-anonymization:** Run a whistleblower or pseudonym account perfectly anonymously, then cryptographically prove it was you later when you want to take credit.
+- **Corporate hierarchy:** A master company root delegates to `@marketing` and `@support`, proving official affiliation without employees holding the master keys.
+
 ## Fully offline
 
 `nsec-tree` makes zero network calls. No DNS lookups, no TLS handshakes, no relay connections, no telemetry. Every operation — root creation, derivation, export, proofs, Shamir splitting — runs entirely on your machine.

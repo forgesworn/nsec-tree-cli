@@ -13,12 +13,14 @@ async function tryImport(specifier, ...fallbacks) {
   try {
     return await import(specifier)
   } catch {
-    for (const fallback of fallbacks) {
-      try {
-        return await import(fallback)
-      } catch {}
+    if (process.env.NSEC_TREE_DEV && fallbacks.length > 0) {
+      for (const fallback of fallbacks) {
+        try {
+          return await import(fallback)
+        } catch {}
+      }
     }
-    throw new Error(`Could not resolve "${specifier}". Run npm install or check sibling repos.`)
+    throw new Error(`Could not resolve "${specifier}". Run npm install.`)
   }
 }
 
