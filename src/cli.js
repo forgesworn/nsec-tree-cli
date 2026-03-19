@@ -434,8 +434,9 @@ async function handleRoot(parsed, io, libraries, options, fmt) {
         '',
         `    ${fmt.c.cyan}${options.cmd(`profile save main --mnemonic "${mnemonic}" --use`)}${fmt.c.reset}`,
         '',
-        `  ${fmt.c.dim}Then:${fmt.c.reset}`,
+        `  ${fmt.c.dim}Then derive identities (name them anything):${fmt.c.reset}`,
         `    ${fmt.c.cyan}${options.cmd('derive path personal')}${fmt.c.reset}`,
+        `    ${fmt.c.cyan}${options.cmd('derive path work/project-x')}${fmt.c.reset}`,
       )
     }
     await printText(io, fmt.section(lines))
