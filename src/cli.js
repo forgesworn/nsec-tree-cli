@@ -975,16 +975,28 @@ async function handleProfile(parsed, io, libraries, options, fmt) {
       await printJson(io, profile)
     } else {
       const profilePath = getProfileFile(name, { baseDir: options.profileBaseDir })
+      const isActive = hasFlag(parsed, 'use')
       const lines = [
         fmt.labelValue('saved profile', profile.name),
         fmt.labelValue('master npub', profile.masterNpub),
         fmt.labelValue('stored at', profilePath),
-        '',
-        fmt.nextSteps([
-          options.cmd('derive path personal'),
-          options.cmd('export npub personal'),
-        ]),
       ]
+      if (isActive) {
+        lines.push(
+          '',
+          fmt.nextSteps([
+            options.cmd('derive path personal'),
+            options.cmd('export npub personal'),
+          ]),
+        )
+      } else {
+        lines.push(
+          '',
+          fmt.nextSteps([
+            options.cmd(`profile use ${name}`),
+          ]),
+        )
+      }
       await printText(io, fmt.section(lines))
     }
     return 0
