@@ -1,0 +1,462 @@
+# nsec-tree-cli
+
+> Nostr users are stuck with one key per identity. Separating contexts (personal, work, anonymous) means managing unrelated keys with no structured recovery and no way to prove they're connected. nsec-tree-cli is an offline-first CLI that derives unlimited unlinkable Nostr identities from a single root secret, with optional cryptographic ownership proofs and human-friendly Shamir backup.
+
+## Install / run
+
+```bash
+# One-off via npx (no install required)
+npx nsec-tree-cli root create --name main
+
+# Or install globally
+npm install -g nsec-tree-cli
+nsec-tree root create --name main
+```
+
+Node >= 22 required. ESM-only.
+
+## Key concepts
+
+- **Root** — a starting secret (mnemonic-backed or nsec-backed) from which all identities derive deterministically. Mnemonic-backed roots support phrase recovery and Shamir splitting; nsec-backed roots derive the same tree but cannot be phrase-recovered.
+- **Derivation path** — a slash-separated sequence of named segments (`personal/forum-burner@0`). Same root + same path = same identity, always. Path segments: lowercase, shell-friendly, max 32 chars, optional `@index` suffix (defaults to `@0`).
+- **Child identity** — a standalone Nostr keypair (npub/nsec) derived from the root. Unlinkable to other children by default.
+- **Ownership proof** — a cryptographic proof that a child shares a root. Private proofs hide the derivation path; full proofs reveal it.
+- **Shamir splitting** — splits a mnemonic into N shares where any T reconstruct it. Word-encoded via `@forgesworn/shamir-words`.
+- **Profile** — a named saved root stored in `~/.nsec-tree/profiles/` (mode 0o600). One profile is active at a time.
+
+---
+
+## Global options (all commands)
+
+| Flag | Description |
+|------|-------------|
+| `--json` | Machine-readable JSON output |
+| `--quiet` | Bare values only, no formatting or hints |
+| `--no-hints` | Suppress contextual "Try next" suggestions |
+| `--help` | Show usage text |
+
+Environment variables:
+- `NSEC_TREE_NO_HINTS=1` — permanently disable hints
+- `NO_COLOR=1` — disable colour output
+- `NSEC_TREE_MNEMONIC=<phrase>` — root input from environment
+- `NSEC_TREE_NSEC=<nsec>` — root input from environment
+- `NSEC_TREE_PROFILE=<name>` — active profile override
+
+Root input sources (mutually exclusive): `--mnemonic`, `--nsec`, `--root-file`, `--stdin`, `--profile`. When none are provided, the active profile is used automatically.
+
+---
+
+## Command reference
+
+### `root create`
+
+Generate a new BIP-39 mnemonic-backed root.
+
+```
+nsec-tree root create [--passphrase <text>] [--name <profile>] [--json] [--quiet] [--out <file>]
+```
+
+```bash
+nsec-tree root create --name main
+# Generates 12-word mnemonic, saves as profile 'main', sets it as active
+
+nsec-tree root create --name work --out ~/work-root.json
+# Also saves root descriptor to a file (mode 0o600)
+
+nsec-tree root create --json
+# → { "rootType": "mnemonic-backed", "recoverable": true,
+#     "masterNpub": "npub1...", "mnemonic": "word1 word2 ..." }
+```
+
+---
+
+### `root restore`
+
+Restore an existing mnemonic-backed root.
+
+```
+nsec-tree root restore (--mnemonic <phrase> | --root-file <file> | --stdin) [--passphrase <text>] [--name <profile>] [--json] [--quiet] [--out <file>]
+```
+
+```bash
+nsec-tree root restore --mnemonic "word1 word2 ... word12" --name main
+nsec-tree root restore --stdin < backup.json --name recovered
+```
+
+---
+
+### `root import-nsec`
+
+Import an existing nsec as a root (nsec-backed root — cannot be phrase-recovered, but supports full derivation).
+
+```
+nsec-tree root import-nsec (--nsec <nsec> | --root-file <file> | --stdin) [--name <profile>] [--json] [--quiet] [--out <file>]
+```
+
+---
+
+### `root inspect`
+
+Show metadata about a root (master npub, root type, recoverability).
+
+```
+nsec-tree root inspect [(--mnemonic | --nsec | --root-file | --stdin | --profile <name>)] [--json]
+```
+
+```bash
+nsec-tree root inspect --json
+# → { "rootType": "mnemonic-backed", "recoverable": true, "masterNpub": "npub1..." }
+```
+
+---
+
+### `derive path`
+
+Derive a child identity at a hierarchical path.
+
+```
+nsec-tree derive path <path> [(root input options)] [--passphrase <text>] [--json]
+```
+
+```bash
+nsec-tree derive path personal/forum-burner
+nsec-tree derive path work/github@0 --json
+# → { "rootType": "mnemonic-backed", "path": "work/github@0",
+#     "segments": [...], "npub": "npub1...", "nsec": "nsec1...",
+#     "publicKey": "<hex>", "purpose": "forum-burner", "index": 0 }
+```
+
+---
+
+### `derive persona`
+
+Derive a single top-level named persona identity.
+
+```
+nsec-tree derive persona <name> [(root input options)] [--passphrase <text>] [--json]
+```
+
+```bash
+nsec-tree derive persona anonymous
+```
+
+---
+
+### `derive account`
+
+Alias for `derive path` — derive a child at an arbitrary path.
+
+```
+nsec-tree derive account <path> [(root input options)] [--passphrase <text>] [--json]
+```
+
+---
+
+### `export npub`
+
+Export just the public key (npub) for a derived identity.
+
+```
+nsec-tree export npub <path> [(root input options)] [--passphrase <text>] [--json] [--quiet]
+```
+
+```bash
+nsec-tree export npub personal/forum-burner --quiet
+# → npub1abc...
+
+nsec-tree export npub personal/forum-burner --json
+# → { "path": "personal/forum-burner@0", "npub": "npub1..." }
+```
+
+---
+
+### `export nsec`
+
+Export the private key (nsec) for a derived identity. Output is flagged as sensitive.
+
+```
+nsec-tree export nsec <path> [(root input options)] [--passphrase <text>] [--json] [--quiet] [--out <file>]
+```
+
+```bash
+nsec-tree export nsec personal/forum-burner --quiet
+# → nsec1abc...
+
+nsec-tree export nsec personal/forum-burner --out ~/forum-burner.nsec
+# Writes to file with mode 0o600
+
+nsec-tree export nsec personal/forum-burner --json
+# → { "path": "personal/forum-burner@0", "nsec": "nsec1..." }
+```
+
+---
+
+### `export identity`
+
+Export the full identity bundle (npub + nsec + metadata).
+
+```
+nsec-tree export identity <path> [(root input options)] [--passphrase <text>] [--json] [--out <file>]
+```
+
+```bash
+nsec-tree export identity personal/forum-burner --json
+# → { "path": "personal/forum-burner@0", "npub": "npub1...", "nsec": "nsec1...",
+#     "publicKey": "<hex>", "purpose": "forum-burner", "index": 0 }
+```
+
+---
+
+### `prove private`
+
+Generate a private ownership proof — proves a child identity shares a root without revealing the derivation path.
+
+```
+nsec-tree prove private <path> [(root input options)] [--passphrase <text>] [--json] [--out <file>]
+```
+
+```bash
+nsec-tree prove private personal/forum-burner --out proof.json
+
+nsec-tree prove private personal/forum-burner --json
+# → { "masterPubkey": "<hex>", "childPubkey": "<hex>",
+#     "attestation": "...", "signature": "..." }
+```
+
+---
+
+### `prove full`
+
+Generate a full ownership proof — proves shared root and reveals the derivation path.
+
+```
+nsec-tree prove full <path> [(root input options)] [--passphrase <text>] [--json] [--out <file>]
+```
+
+---
+
+### `verify proof`
+
+Verify a proof file (private or full).
+
+```
+nsec-tree verify proof [<file> | --stdin] [--json] [--quiet]
+```
+
+```bash
+nsec-tree verify proof proof.json
+nsec-tree verify proof --stdin < proof.json --json
+# → { "valid": true, "proofType": "private",
+#     "proof": { "masterPubkey": "...", "childPubkey": "..." } }
+```
+
+---
+
+### `shamir split`
+
+Split a mnemonic-backed root into N Shamir shares (any T reconstruct it). Shares are BIP-39 word-encoded.
+
+```
+nsec-tree shamir split [(root input options)] --shares <n> --threshold <t> [--json] [--out-dir <dir>]
+```
+
+```bash
+nsec-tree shamir split --shares 5 --threshold 3
+# Generates 5 share files, any 3 reconstruct the mnemonic
+
+nsec-tree shamir split --shares 3 --threshold 2 --out-dir ~/shamir-backup
+# Writes share files to the specified directory (mode 0o700)
+```
+
+---
+
+### `shamir recover`
+
+Reconstruct a mnemonic from T or more Shamir shares.
+
+```
+nsec-tree shamir recover [<share-file> ... | --stdin] [--json] [--out <file>]
+```
+
+```bash
+nsec-tree shamir recover share-1.json share-2.json share-3.json
+nsec-tree shamir recover share-1.json share-2.json --json
+# → { "rootType": "mnemonic-backed", "mnemonic": "word1 word2 ...", "recoverable": true }
+```
+
+---
+
+### `profile save`
+
+Save a root as a named profile in `~/.nsec-tree/profiles/`.
+
+```
+nsec-tree profile save <name> (--mnemonic | --nsec | --root-file | --stdin) [--passphrase <text>] [--force] [--use] [--json]
+```
+
+```bash
+nsec-tree profile save work --mnemonic "word1 ..." --use
+# --use sets 'work' as the active profile
+# --force overwrites if name already exists
+```
+
+---
+
+### `profile list`
+
+List all saved profiles.
+
+```
+nsec-tree profile list [--json]
+```
+
+```bash
+nsec-tree profile list --json
+# → [{ "name": "main", "active": true, "rootType": "mnemonic-backed", "recoverable": true }, ...]
+```
+
+---
+
+### `profile use`
+
+Set the active profile.
+
+```
+nsec-tree profile use <name> [--json]
+```
+
+---
+
+### `profile show`
+
+Show details of a named profile (or the active one if no name given).
+
+```
+nsec-tree profile show [name] [--json]
+```
+
+---
+
+### `profile remove`
+
+Remove a saved profile.
+
+```
+nsec-tree profile remove <name> [--json]
+```
+
+---
+
+### `inspect path`
+
+Examine a derivation path — parse and describe its segments without performing derivation.
+
+```
+nsec-tree inspect path <path> [--json]
+```
+
+```bash
+nsec-tree inspect path personal/forum-burner@2 --json
+# → { "segments": [{ "name": "personal", "requestedIndex": 0 },
+#                  { "name": "forum-burner", "requestedIndex": 2 }] }
+```
+
+---
+
+### `inspect root`
+
+Inspect a root without persisting it. Shows metadata.
+
+```
+nsec-tree inspect root [(root input options)] [--json]
+```
+
+---
+
+### `explain`
+
+Built-in tutorials rendered in the terminal.
+
+```
+nsec-tree explain model|proofs|recovery|paths|offline
+```
+
+| Topic | Content |
+|-------|---------|
+| `model` | How hierarchical derivation works |
+| `proofs` | How private and full ownership proofs work |
+| `recovery` | Mnemonic and Shamir recovery options |
+| `paths` | Path syntax, segments, and index semantics |
+| `offline` | Air-gapped usage and security model |
+
+---
+
+## JSON output shapes
+
+All `--json` output is stable across patch versions.
+
+```typescript
+// root create / root restore / root import-nsec
+{ rootType: 'mnemonic-backed' | 'nsec-backed', recoverable: boolean,
+  masterNpub: string, mnemonic?: string }
+
+// derive path / derive persona / derive account
+{ rootType: string, path: string,
+  segments: Array<{ name: string, requestedIndex: number, actualIndex: number, npub: string }>,
+  npub: string, nsec: string, publicKey: string, purpose: string, index: number }
+
+// export npub
+{ path: string, npub: string }
+
+// export nsec
+{ path: string, nsec: string }
+
+// export identity
+{ path: string, npub: string, nsec: string, publicKey: string, purpose: string, index: number }
+
+// prove private
+{ masterPubkey: string, childPubkey: string, attestation: string, signature: string }
+
+// prove full
+{ masterPubkey: string, childPubkey: string, path: string, attestation: string, signature: string }
+
+// verify proof
+{ valid: boolean, proofType: 'private' | 'full', proof: object }
+
+// shamir split
+{ shares: string[], threshold: number, total: number }
+
+// shamir recover
+{ rootType: string, mnemonic: string, recoverable: boolean }
+
+// profile list
+Array<{ name: string, active: boolean, rootType: string, recoverable: boolean }>
+```
+
+---
+
+## Security model
+
+- All crypto operations are handled by the `nsec-tree` library — the CLI owns grammar, I/O, and formatting only.
+- The root secret never touches a network. All derivation is local and offline.
+- Secret files are written with mode `0o600`; directories with `0o700`.
+- `NSEC_TREE_MNEMONIC` and `NSEC_TREE_NSEC` environment variables are accepted but not logged.
+- Shamir shares are individually harmless below the threshold; combine only on a trusted offline machine.
+
+---
+
+## Built on
+
+- [nsec-tree](https://www.npmjs.com/package/nsec-tree) — derivation, proofs, and verification library
+- [@forgesworn/shamir-words](https://www.npmjs.com/package/@forgesworn/shamir-words) — Shamir secret sharing with BIP-39 word output
+- [@scure/bip39](https://www.npmjs.com/package/@scure/bip39) — mnemonic generation and validation
+
+---
+
+## Links
+
+- [npm](https://www.npmjs.com/package/nsec-tree-cli)
+- [GitHub](https://github.com/forgesworn/nsec-tree-cli)
+- [JSON-SCHEMAS.md](https://github.com/forgesworn/nsec-tree-cli/blob/main/JSON-SCHEMAS.md) — full JSON output schemas
+- [CLI-SPEC.md](https://github.com/forgesworn/nsec-tree-cli/blob/main/CLI-SPEC.md) — command grammar and design principles
+- [ARCHITECTURE.md](https://github.com/forgesworn/nsec-tree-cli/blob/main/ARCHITECTURE.md) — separation of concerns between CLI and libraries
