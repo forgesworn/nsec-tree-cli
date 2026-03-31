@@ -61,7 +61,7 @@ $ nsec-tree prove private personal/forum-burner --mnemonic "abandon ... about"
   proof type    private
   master pubkey 3eb14b...8d656
   child pubkey  4f6d38...f61f26
-  attestation   nsec-tree:own:3eb14b...8d656:4f6d38...f61f26
+  attestation   nsec-tree:own|3eb14b...8d656|4f6d38...f61f26
   signature     e3086d...56be4
 
   This proof shows shared root ownership
