@@ -36,6 +36,8 @@ const VALUE_OPTIONS = new Set([
   'shares',
   'threshold',
 ])
+const PROMPTABLE_SECRETS = new Set(['mnemonic', 'nsec', 'passphrase'])
+const PROMPT_SENTINEL = Symbol('prompt-for-secret')
 const PATH_SEGMENT_RE = /^(?<name>[a-z0-9][a-z0-9:-]{0,31})(?:@(?<index>\d+))?$/
 
 const HELP_TEXT = `nsec-tree CLI
@@ -79,8 +81,15 @@ Options:
   --no-hints      Suppress "Try next" suggestions
   --help          Show this help text
 
+Secret input:
+  Pass --mnemonic, --nsec, or --passphrase with no value to be prompted
+  interactively (echo suppressed). Avoids leaking secrets into shell history.
+
 Environment:
   NSEC_TREE_NO_HINTS=1    Permanently disable hints
+  NSEC_TREE_MNEMONIC      Provide the mnemonic via env var
+  NSEC_TREE_NSEC          Provide the nsec via env var
+  NSEC_TREE_PROFILE       Default profile name
   NO_COLOR=1              Disable colour output
 
 Examples:
@@ -98,6 +107,56 @@ function detectCommandPrefix() {
   return 'nsec-tree'
 }
 
+async function promptSecretFromTty(label) {
+  if (!process.stdin.isTTY) {
+    throw new CliUsageError(
+      `Cannot prompt for "${label.replace(/:\s*$/, '')}" because stdin is not a terminal. ` +
+        'Pipe the value via --stdin, read it from a file with --root-file, or set the matching env var.',
+    )
+  }
+  return new Promise((resolve, reject) => {
+    process.stderr.write(label)
+    const stdin = process.stdin
+    const wasRaw = stdin.isRaw
+    stdin.setRawMode(true)
+    stdin.resume()
+    stdin.setEncoding('utf8')
+
+    let buffer = ''
+
+    const cleanup = () => {
+      stdin.removeListener('data', onData)
+      stdin.setRawMode(Boolean(wasRaw))
+      stdin.pause()
+    }
+    const onData = (chunk) => {
+      for (const ch of chunk) {
+        const code = ch.charCodeAt(0)
+        if (code === 13 || code === 10) {
+          cleanup()
+          process.stderr.write('\n')
+          resolve(buffer)
+          return
+        }
+        if (code === 3) {
+          cleanup()
+          process.stderr.write('\n')
+          reject(new CliUsageError('Cancelled'))
+          return
+        }
+        if (code === 127 || code === 8) {
+          if (buffer.length > 0) buffer = buffer.slice(0, -1)
+          continue
+        }
+        if (code < 32) continue
+        buffer += ch
+      }
+    }
+    stdin.on('data', onData)
+  })
+}
+
+
 export const nodeIo = {
   async stdout(text) {
     process.stdout.write(text)
@@ -111,6 +170,9 @@ export const nodeIo = {
       chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk)
     }
     return Buffer.concat(chunks).toString('utf8')
+  },
+  async promptSecret(label) {
+    return promptSecretFromTty(label)
   },
   isStdoutTty: Boolean(process.stdout.isTTY),
   commandPrefix: detectCommandPrefix(),
@@ -150,6 +212,10 @@ function parseArgs(argv) {
 
     const value = inlineValue ?? argv[index + 1]
     if (value === undefined || value.startsWith('--')) {
+      if (inlineValue === undefined && PROMPTABLE_SECRETS.has(name)) {
+        options.set(name, PROMPT_SENTINEL)
+        continue
+      }
       throw new CliUsageError(`Option "--${name}" requires a value`)
     }
     options.set(name, value)
@@ -168,6 +234,22 @@ function hasFlag(parsed, name) {
 function getOption(parsed, name) {
   const value = parsed.options.get(name)
   return typeof value === 'string' ? value : undefined
+}
+
+function shouldPromptFor(parsed, name) {
+  return parsed.options.get(name) === PROMPT_SENTINEL
+}
+
+async function promptIfRequested(parsed, io, name) {
+  if (!shouldPromptFor(parsed, name)) return undefined
+  if (typeof io.promptSecret !== 'function') {
+    throw new CliUsageError(`Cannot prompt for "${name}" in this environment`)
+  }
+  const value = await io.promptSecret(`${name}: `)
+  if (!value) {
+    throw new CliUsageError(`No value entered for "--${name}"`)
+  }
+  return value
 }
 
 function getEnv(name) {
@@ -246,16 +328,20 @@ function readDescriptorFromText(text) {
 }
 
 async function resolveRootSource(parsed, io, libraries, options = {}) {
-  const mnemonic = getOption(parsed, 'mnemonic') ?? getEnv('NSEC_TREE_MNEMONIC')
-  const nsec = getOption(parsed, 'nsec') ?? getEnv('NSEC_TREE_NSEC')
+  const mnemonicArg = getOption(parsed, 'mnemonic') ?? getEnv('NSEC_TREE_MNEMONIC')
+  const nsecArg = getOption(parsed, 'nsec') ?? getEnv('NSEC_TREE_NSEC')
+  const mnemonicPrompt = shouldPromptFor(parsed, 'mnemonic')
+  const nsecPrompt = shouldPromptFor(parsed, 'nsec')
   const rootFile = getOption(parsed, 'root-file')
   const useStdin = hasFlag(parsed, 'stdin')
   const explicitProfile = getOption(parsed, 'profile') ?? getEnv('NSEC_TREE_PROFILE')
-  const passphrase = getOption(parsed, 'passphrase')
+
+  const hasMnemonic = Boolean(mnemonicArg) || mnemonicPrompt
+  const hasNsec = Boolean(nsecArg) || nsecPrompt
 
   const labels = [
-    mnemonic ? 'mnemonic' : null,
-    nsec ? 'nsec' : null,
+    hasMnemonic ? 'mnemonic' : null,
+    hasNsec ? 'nsec' : null,
     rootFile ? 'root-file' : null,
     useStdin ? 'stdin' : null,
     explicitProfile ? 'profile' : null,
@@ -265,13 +351,16 @@ async function resolveRootSource(parsed, io, libraries, options = {}) {
     throw new CliUsageError(`Expected exactly one root input source, got ${labels.length}`)
   }
 
-  if (mnemonic) {
+  if (hasMnemonic) {
+    const mnemonic = mnemonicPrompt ? await promptIfRequested(parsed, io, 'mnemonic') : mnemonicArg
+    const passphrase = (await promptIfRequested(parsed, io, 'passphrase')) ?? getOption(parsed, 'passphrase')
     return {
       descriptor: { type: 'mnemonic-backed', mnemonic, passphrase },
       source: 'explicit mnemonic',
     }
   }
-  if (nsec) {
+  if (hasNsec) {
+    const nsec = nsecPrompt ? await promptIfRequested(parsed, io, 'nsec') : nsecArg
     return {
       descriptor: { type: 'nsec-backed', nsec },
       source: 'explicit nsec',
