@@ -1,5 +1,13 @@
 # [1.1.0](https://github.com/forgesworn/nsec-tree-cli/compare/v1.0.2...v1.1.0) (2026-03-19)
 
+## 1.2.0 (2026-05-27)
+
+### Features
+
+- prompt interactively for bare secret flags
+
+
+
 
 ### Bug Fixes
 
