@@ -1,5 +1,17 @@
 # [1.1.0](https://github.com/forgesworn/nsec-tree-cli/compare/v1.0.2...v1.1.0) (2026-03-19)
 
+## 2.0.0 (2026-06-22)
+
+### Breaking Changes
+
+- `derive persona <name>` now resolves to purpose
+
+### Features
+
+- derive persona uses the reserved nostr:persona: namespace
+
+
+
 ## 1.2.0 (2026-05-27)
 
 ### Features
