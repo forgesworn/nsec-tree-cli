@@ -23,7 +23,7 @@ class CliUsageError extends Error {
   }
 }
 
-const BOOLEAN_OPTIONS = new Set(['json', 'quiet', 'stdin', 'help', 'force', 'use', 'no-hints'])
+const BOOLEAN_OPTIONS = new Set(['json', 'quiet', 'stdin', 'help', 'force', 'use', 'no-hints', 'persona'])
 const VALUE_OPTIONS = new Set([
   'mnemonic',
   'nsec',
@@ -78,8 +78,15 @@ Usage:
 Options:
   --json          Machine-readable JSON output
   --quiet         Bare values only, no formatting
+  --persona       Treat <name> as a persona: derive purpose nostr:persona:<name>
   --no-hints      Suppress "Try next" suggestions
   --help          Show this help text
+
+Personas:
+  A persona named X is the identity at purpose nostr:persona:X (PROTOCOL v1.1 §3.1)
+  — the same key signet and the hardware signer derive. "derive persona X" is
+  shorthand; add --persona to export or prove a persona by name. A raw
+  "derive path X" (purpose "X") is a DIFFERENT identity — don't conflate them.
 
 Secret input:
   Pass --mnemonic, --nsec, or --passphrase with no value to be prompted
@@ -94,9 +101,11 @@ Environment:
 
 Examples:
   nsec-tree root create --name main
+  nsec-tree derive persona social
+  nsec-tree export npub social --persona
   nsec-tree derive path personal/forum-burner
   nsec-tree export nsec personal/forum-burner
-  nsec-tree prove private personal/forum-burner
+  nsec-tree prove private social --persona
 `
 
 function detectCommandPrefix() {
@@ -296,6 +305,41 @@ function parsePath(rawPath) {
       requestedIndex: match.groups.index ? Number.parseInt(match.groups.index, 10) : 0,
     }
   })
+}
+
+const PERSONA_PREFIX = 'nostr:persona:'
+
+// A persona named X is the child at purpose `nostr:persona:X` (PROTOCOL §3.1) —
+// the very same identity signet and the hardware signer derive. Expand a persona
+// name into that single-segment path so the existing path pipeline derives it.
+function expandPersonaArg(name) {
+  if (name.startsWith(PERSONA_PREFIX)) return name
+  if (name.includes('/')) {
+    throw new CliUsageError(
+      'A persona is a single name, so "/" is not allowed here. ' +
+        'Use `derive path` for multi-level paths.',
+    )
+  }
+  return `${PERSONA_PREFIX}${name}`
+}
+
+// Route `derive persona NAME` through the path pipeline with the persona flag set.
+function asPersonaInvocation(parsed) {
+  const options = new Map(parsed.options)
+  options.set('persona', true)
+  return { ...parsed, positionals: ['derive', 'path', parsed.positionals[2]], options }
+}
+
+// `derive persona` used to be a silent alias for a raw path; since PROTOCOL v1.1
+// it derives the reserved `nostr:persona:` namespace. Warn so anyone who minted a
+// persona under the old raw behaviour knows to reproduce it with `derive path`.
+async function notePersonaSemantics(io, parsed, options) {
+  if (hasFlag(parsed, 'json') || hasFlag(parsed, 'quiet') || !options.showHints) return
+  await io.stderr(
+    'Note: `derive persona <name>` derives the reserved purpose `nostr:persona:<name>` ' +
+      '(PROTOCOL v1.1), matching signet and the hardware signer.\n' +
+      '      A raw single-segment identity is `derive path <name>`.\n',
+  )
 }
 
 async function printText(io, text) {
@@ -623,9 +667,12 @@ async function withDerivedPath(parsed, io, libraries, options, fmt, handler) {
     profileBaseDir: options.profileBaseDir,
     allowImplicitProfile: true,
   })
-  const pathArg = parsed.positionals[2]
+  let pathArg = parsed.positionals[2]
   if (!pathArg) {
     throw new CliUsageError('Path argument is required')
+  }
+  if (hasFlag(parsed, 'persona')) {
+    pathArg = expandPersonaArg(pathArg)
   }
   const opened = openRoot(libraries, rootSource.descriptor)
   let result
@@ -648,7 +695,10 @@ async function handleDerive(parsed, io, libraries, options, fmt) {
     throw new CliUsageError('Supported derive subcommands are: path, persona, account')
   }
 
-  if ((subcommand === 'persona' || subcommand === 'account') && parsed.positionals[2]) {
+  if (subcommand === 'persona' && parsed.positionals[2]) {
+    await notePersonaSemantics(io, parsed, options)
+    parsed = asPersonaInvocation(parsed)
+  } else if (subcommand === 'account' && parsed.positionals[2]) {
     parsed = {
       ...parsed,
       positionals: ['derive', 'path', parsed.positionals[2]],
@@ -680,9 +730,10 @@ async function handleDerive(parsed, io, libraries, options, fmt) {
       '',
     ]
     const pathArg = parsed.positionals[2]
+    const personaSuffix = hasFlag(parsed, 'persona') ? ' --persona' : ''
     lines.push('', fmt.nextSteps([
-      options.cmd(`export nsec ${pathArg}`),
-      options.cmd(`prove private ${pathArg}`),
+      options.cmd(`export nsec ${pathArg}${personaSuffix}`),
+      options.cmd(`prove private ${pathArg}${personaSuffix}`),
     ]))
     await printText(io, fmt.section(lines))
     return 0
@@ -697,6 +748,7 @@ async function handleExport(parsed, io, libraries, options, fmt) {
 
   return withDerivedPath(parsed, io, libraries, options, fmt, async (result, _rootInfo, fmt) => {
     const outFile = getOption(parsed, 'out')
+    const personaSuffix = hasFlag(parsed, 'persona') ? ' --persona' : ''
     if (subcommand === 'npub') {
       const payload = { path: result.normalizedPath, npub: result.identity.npub }
       if (hasFlag(parsed, 'json')) {
@@ -709,8 +761,8 @@ async function handleExport(parsed, io, libraries, options, fmt) {
           fmt.labelValue('npub', result.identity.npub),
           '',
           fmt.nextSteps([
-            options.cmd(`export nsec ${parsed.positionals[2]}`),
-            options.cmd(`prove private ${parsed.positionals[2]}`),
+            options.cmd(`export nsec ${parsed.positionals[2]}${personaSuffix}`),
+            options.cmd(`prove private ${parsed.positionals[2]}${personaSuffix}`),
           ]),
         ]
         await printText(io, fmt.section(lines))
@@ -739,7 +791,7 @@ async function handleExport(parsed, io, libraries, options, fmt) {
           fmt.warning('This is a private key. Store it securely.'),
           '',
           fmt.nextSteps([
-            options.cmd(`prove private ${parsed.positionals[2]}`),
+            options.cmd(`prove private ${parsed.positionals[2]}${personaSuffix}`),
           ]),
         ]
         await printText(io, fmt.section(lines))
@@ -765,7 +817,7 @@ async function handleExport(parsed, io, libraries, options, fmt) {
         `  ${fmt.c.dim}This child is a standalone Nostr identity.${fmt.c.reset}`,
         '',
         fmt.nextSteps([
-          options.cmd(`prove private ${parsed.positionals[2]}`),
+          options.cmd(`prove private ${parsed.positionals[2]}${personaSuffix}`),
         ]),
       ]
       await printText(io, fmt.section(lines))
@@ -781,6 +833,7 @@ async function handleProve(parsed, io, libraries, options, fmt) {
   }
 
   return withDerivedPath(parsed, io, libraries, options, fmt, async (result, rootInfo, fmt) => {
+    const personaSuffix = hasFlag(parsed, 'persona') ? ' --persona' : ''
     const proof =
       subcommand === 'private'
         ? libraries.nsecTree.createBlindProof(rootInfo.root, result.identity)
@@ -807,7 +860,7 @@ async function handleProve(parsed, io, libraries, options, fmt) {
         : 'This proof reveals the full derivation path.\n  Anyone can verify the exact relationship.'
       lines.push('', `  ${fmt.c.dim}${explanation}${fmt.c.reset}`)
       lines.push('', fmt.nextSteps([
-        options.cmd(`prove ${subcommand} ${parsed.positionals[2]} --json | ${options.cmd('verify proof --stdin')}`),
+        options.cmd(`prove ${subcommand} ${parsed.positionals[2]}${personaSuffix} --json | ${options.cmd('verify proof --stdin')}`),
       ]))
       await printText(io, fmt.section(lines))
     }

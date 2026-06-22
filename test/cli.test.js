@@ -101,7 +101,7 @@ describe('nsec-tree CLI', () => {
     assert.match(payload.npub, /^npub1/)
   })
 
-  it('derive persona alias works', async () => {
+  it('derive persona derives the nostr:persona: namespace (PROTOCOL v1.1)', async () => {
     const io = new MemoryIo()
     const exitCode = await runCli(
       ['derive', 'persona', 'personal', '--mnemonic', TEST_MNEMONIC, '--json'],
@@ -109,8 +109,40 @@ describe('nsec-tree CLI', () => {
     )
     assert.equal(exitCode, 0)
     const payload = JSON.parse(io.stdoutBuffer)
-    assert.equal(payload.path, 'personal@0')
-    assert.match(payload.npub, /^npub1/)
+    assert.equal(payload.path, 'nostr:persona:personal@0')
+    assert.equal(payload.purpose, 'nostr:persona:personal')
+    // Frozen: PROTOCOL §3.1 persona of the abandon…about root.
+    assert.equal(payload.npub, 'npub17kujk8s65ylf88ratln395jt9qs52vnkq4t908qqgmd3nxfa76qqxz23j7')
+  })
+
+  it('export npub --persona matches derive persona, and differs from the raw path', async () => {
+    const ioPersona = new MemoryIo()
+    await runCli(['export', 'npub', 'social', '--persona', '--mnemonic', TEST_MNEMONIC, '--json'], ioPersona)
+    const persona = JSON.parse(ioPersona.stdoutBuffer)
+    assert.equal(persona.path, 'nostr:persona:social@0')
+    assert.equal(persona.npub, 'npub1qdztfxg9z46k8qg4707n747y9rt7kl3f954lju2pneesmc3ypf2q83gm0e')
+
+    const ioRaw = new MemoryIo()
+    await runCli(['export', 'npub', 'social', '--mnemonic', TEST_MNEMONIC, '--json'], ioRaw)
+    const raw = JSON.parse(ioRaw.stdoutBuffer)
+    assert.notEqual(raw.npub, persona.npub, 'the raw purpose "social" must not equal the persona')
+  })
+
+  it('derive persona prints a migration note on stderr (non-json)', async () => {
+    const io = new MemoryIo()
+    await runCli(['derive', 'persona', 'social', '--mnemonic', TEST_MNEMONIC], io)
+    assert.match(io.stderrBuffer, /nostr:persona:/)
+    assert.match(io.stderrBuffer, /derive path/)
+  })
+
+  it('--persona rejects a multi-segment name', async () => {
+    const io = new MemoryIo()
+    const exitCode = await runCli(
+      ['derive', 'persona', 'a/b', '--mnemonic', TEST_MNEMONIC, '--json'],
+      io,
+    )
+    assert.equal(exitCode, 1)
+    assert.match(io.stderrBuffer, /single name/)
   })
 
   it('derive account alias works', async () => {
