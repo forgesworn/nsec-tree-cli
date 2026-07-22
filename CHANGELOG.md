@@ -1,5 +1,13 @@
 # [1.1.0](https://github.com/forgesworn/nsec-tree-cli/compare/v1.0.2...v1.1.0) (2026-03-19)
 
+## 2.0.1 (2026-07-22)
+
+### Bug Fixes
+
+- never echo secrets to stdout when --out/--out-dir is given
+
+
+
 ## 2.0.0 (2026-06-22)
 
 ### Breaking Changes
