@@ -526,6 +526,29 @@ async function handleRoot(parsed, io, libraries, options, fmt) {
     const outFile = getOption(parsed, 'out')
     if (outFile) {
       await writeSecretFile(outFile, `${JSON.stringify(descriptor, null, 2)}\n`)
+      if (hasFlag(parsed, 'quiet')) {
+        return 0
+      }
+      if (hasFlag(parsed, 'json')) {
+        await printJson(io, { ...summary, profile: savedProfile?.name, out: outFile })
+        return 0
+      }
+      const lines = [
+        fmt.boxHeader('Root created'),
+        '',
+        fmt.labelValue('root type', 'mnemonic-backed'),
+        fmt.labelValue('recoverable', 'yes'),
+        fmt.labelValue('master npub', summary.masterNpub),
+        '',
+        fmt.labelValue('mnemonic', `written to ${outFile}`),
+        '',
+        fmt.warning('Secret written to file only. Store it offline; it cannot be recovered.'),
+      ]
+      if (savedProfile) {
+        lines.splice(5, 0, fmt.labelValue('profile', `${savedProfile.name} (active)`))
+      }
+      await printText(io, fmt.section(lines))
+      return 0
     }
     const payload = {
       ...summary,
@@ -778,6 +801,22 @@ async function handleExport(parsed, io, libraries, options, fmt) {
             ? `${JSON.stringify({ path: result.normalizedPath, nsec: result.identity.nsec }, null, 2)}\n`
             : `${result.identity.nsec}\n`,
         )
+        if (hasFlag(parsed, 'quiet')) {
+          return 0
+        }
+        if (hasFlag(parsed, 'json')) {
+          await printJson(io, { path: result.normalizedPath, npub: result.identity.npub, out: outFile })
+          return 0
+        }
+        const lines = [
+          fmt.labelValue('path', result.normalizedPath),
+          fmt.labelValue('npub', result.identity.npub),
+          fmt.labelValue('nsec', `written to ${outFile}`),
+          '',
+          fmt.warning('Secret written to file only. It was not printed.'),
+        ]
+        await printText(io, fmt.section(lines))
+        return 0
       }
       if (hasFlag(parsed, 'json')) {
         await printJson(io, { path: result.normalizedPath, nsec: result.identity.nsec })
@@ -802,6 +841,22 @@ async function handleExport(parsed, io, libraries, options, fmt) {
     const payload = identityPayload(result)
     if (outFile) {
       await writeSecretFile(outFile, `${JSON.stringify(payload, null, 2)}\n`)
+      if (hasFlag(parsed, 'quiet')) {
+        return 0
+      }
+      if (hasFlag(parsed, 'json')) {
+        await printJson(io, { path: result.normalizedPath, npub: result.identity.npub, out: outFile })
+        return 0
+      }
+      const lines = [
+        fmt.labelValue('path', result.normalizedPath),
+        fmt.labelValue('npub', result.identity.npub),
+        fmt.labelValue('identity', `written to ${outFile}`),
+        '',
+        fmt.warning('Secret written to file only. It was not printed.'),
+      ]
+      await printText(io, fmt.section(lines))
+      return 0
     }
     if (hasFlag(parsed, 'json')) {
       await printJson(io, payload)
@@ -992,6 +1047,37 @@ async function handleShamir(parsed, io, libraries, options, fmt) {
         for (const share of payload) {
           await writeSecretFile(join(outDir, `share-${share.index}.txt`), `${share.phrase}\n`)
         }
+        if (hasFlag(parsed, 'quiet')) {
+          return 0
+        }
+        if (hasFlag(parsed, 'json')) {
+          await printJson(io, {
+            rootType: 'mnemonic-backed',
+            recoverable: true,
+            shares: payload.map((share) => ({
+              index: share.index,
+              threshold: share.threshold,
+              file: join(outDir, `share-${share.index}.txt`),
+            })),
+          })
+          return 0
+        }
+        const lines = [
+          fmt.boxHeader('Shamir split complete'),
+          '',
+          fmt.labelValue('shares', String(shares)),
+          fmt.labelValue('threshold', String(threshold)),
+          '',
+        ]
+        for (const share of payload) {
+          lines.push(fmt.labelValue(`share ${share.index}`, `written to ${join(outDir, `share-${share.index}.txt`)}`))
+        }
+        lines.push(
+          '',
+          fmt.warning(`Secrets written to files only. Store each share separately. Any ${threshold} of ${shares} can recover the mnemonic.`),
+        )
+        await printText(io, fmt.section(lines))
+        return 0
       }
       if (hasFlag(parsed, 'json')) {
         await printJson(io, {
@@ -1058,6 +1144,23 @@ async function handleShamir(parsed, io, libraries, options, fmt) {
       const outFile = getOption(parsed, 'out')
       if (outFile) {
         await writeSecretFile(outFile, `${mnemonic}\n`)
+        if (hasFlag(parsed, 'quiet')) {
+          return 0
+        }
+        if (hasFlag(parsed, 'json')) {
+          await printJson(io, { rootType: 'mnemonic-backed', recoverable: true, out: outFile })
+          return 0
+        }
+        await printText(io, fmt.section([
+          fmt.boxHeader('Mnemonic recovered'),
+          '',
+          fmt.labelValue('root type', 'mnemonic-backed'),
+          fmt.labelValue('recoverable', 'yes'),
+          fmt.labelValue('mnemonic', `written to ${outFile}`),
+          '',
+          fmt.warning('Secret written to file only. Store it offline.'),
+        ]))
+        return 0
       }
       if (hasFlag(parsed, 'json')) {
         await printJson(io, {

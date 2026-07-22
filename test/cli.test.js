@@ -321,6 +321,137 @@ describe('nsec-tree CLI', () => {
   }
 })
 
+describe('secrets never echo to stdout when written to a file', () => {
+  it('export nsec --json --out --quiet writes the file and prints nothing', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'nsec-tree-cli-'))
+    tempDirs.push(directory)
+    const outputFile = join(directory, 'key.json')
+    const io = new MemoryIo()
+
+    const exitCode = await runCli(
+      ['export', 'nsec', 'personal', '--mnemonic', TEST_MNEMONIC, '--json', '--out', outputFile, '--quiet'],
+      io,
+    )
+    assert.equal(exitCode, 0)
+    const saved = JSON.parse(await readFile(outputFile, 'utf8'))
+    assert.match(saved.nsec, /^nsec1/)
+    assert.equal(io.stdoutBuffer, '')
+  })
+
+  it('export nsec --json --out prints a confirmation without the secret', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'nsec-tree-cli-'))
+    tempDirs.push(directory)
+    const outputFile = join(directory, 'key.json')
+    const io = new MemoryIo()
+
+    const exitCode = await runCli(
+      ['export', 'nsec', 'personal', '--mnemonic', TEST_MNEMONIC, '--json', '--out', outputFile],
+      io,
+    )
+    assert.equal(exitCode, 0)
+    const payload = JSON.parse(io.stdoutBuffer)
+    assert.equal(payload.out, outputFile)
+    assert.equal(payload.nsec, undefined)
+    assert.match(payload.npub, /^npub1/)
+    assert.doesNotMatch(io.stdoutBuffer, /nsec1[0-9a-z]{20,}/)
+  })
+
+  it('export nsec --out (human output) keeps the secret off stdout', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'nsec-tree-cli-'))
+    tempDirs.push(directory)
+    const outputFile = join(directory, 'key.txt')
+    const io = new MemoryIo()
+
+    const exitCode = await runCli(
+      ['export', 'nsec', 'personal', '--mnemonic', TEST_MNEMONIC, '--out', outputFile],
+      io,
+    )
+    assert.equal(exitCode, 0)
+    assert.match((await readFile(outputFile, 'utf8')).trim(), /^nsec1/)
+    assert.doesNotMatch(io.stdoutBuffer, /nsec1[0-9a-z]{20,}/)
+    assert.match(io.stdoutBuffer, /written to/)
+  })
+
+  it('export identity --out keeps the secret off stdout', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'nsec-tree-cli-'))
+    tempDirs.push(directory)
+    const outputFile = join(directory, 'identity.json')
+    const io = new MemoryIo()
+
+    const exitCode = await runCli(
+      ['export', 'identity', 'personal', '--mnemonic', TEST_MNEMONIC, '--json', '--out', outputFile],
+      io,
+    )
+    assert.equal(exitCode, 0)
+    const saved = JSON.parse(await readFile(outputFile, 'utf8'))
+    assert.match(saved.nsec, /^nsec1/)
+    const payload = JSON.parse(io.stdoutBuffer)
+    assert.equal(payload.nsec, undefined)
+    assert.doesNotMatch(io.stdoutBuffer, /nsec1[0-9a-z]{20,}/)
+  })
+
+  it('root create --out keeps the mnemonic off stdout', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'nsec-tree-cli-'))
+    tempDirs.push(directory)
+    const outputFile = join(directory, 'root.json')
+    const io = new MemoryIo()
+
+    const exitCode = await runCli(['root', 'create', '--json', '--out', outputFile], io)
+    assert.equal(exitCode, 0)
+    const descriptor = JSON.parse(await readFile(outputFile, 'utf8'))
+    assert.equal(typeof descriptor.mnemonic, 'string')
+    assert.ok(!io.stdoutBuffer.includes(descriptor.mnemonic))
+    const payload = JSON.parse(io.stdoutBuffer)
+    assert.equal(payload.mnemonic, undefined)
+    assert.equal(payload.out, outputFile)
+  })
+
+  it('shamir split --out-dir keeps share phrases off stdout', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'nsec-tree-cli-'))
+    tempDirs.push(directory)
+    const outDir = join(directory, 'shares')
+    const io = new MemoryIo()
+
+    const exitCode = await runCli(
+      ['shamir', 'split', '--mnemonic', TEST_MNEMONIC, '--shares', '3', '--threshold', '2', '--json', '--out-dir', outDir],
+      io,
+    )
+    assert.equal(exitCode, 0)
+    const share1 = (await readFile(join(outDir, 'share-1.txt'), 'utf8')).trim()
+    assert.ok(share1.split(' ').length > 10)
+    assert.ok(!io.stdoutBuffer.includes(share1))
+    const payload = JSON.parse(io.stdoutBuffer)
+    assert.equal(payload.shares.length, 3)
+    assert.equal(payload.shares[0].phrase, undefined)
+    assert.equal(payload.shares[0].words, undefined)
+  })
+
+  it('shamir recover --out keeps the mnemonic off stdout', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'nsec-tree-cli-'))
+    tempDirs.push(directory)
+    const outDir = join(directory, 'shares')
+    const splitIo = new MemoryIo()
+    await runCli(
+      ['shamir', 'split', '--mnemonic', TEST_MNEMONIC, '--shares', '3', '--threshold', '2', '--quiet', '--out-dir', outDir],
+      splitIo,
+    )
+    assert.equal(splitIo.stdoutBuffer, '')
+
+    const outputFile = join(directory, 'recovered.txt')
+    const io = new MemoryIo()
+    const exitCode = await runCli(
+      ['shamir', 'recover', join(outDir, 'share-1.txt'), join(outDir, 'share-2.txt'), '--json', '--out', outputFile],
+      io,
+    )
+    assert.equal(exitCode, 0)
+    assert.equal((await readFile(outputFile, 'utf8')).trim(), TEST_MNEMONIC)
+    assert.ok(!io.stdoutBuffer.includes(TEST_MNEMONIC))
+    const payload = JSON.parse(io.stdoutBuffer)
+    assert.equal(payload.mnemonic, undefined)
+    assert.equal(payload.out, outputFile)
+  })
+})
+
 describe('contextual next-steps (HATEOAS)', () => {
   it('root create without profile shows copy-paste profile save command with mnemonic', async () => {
     const io = new MemoryIo('', false)
