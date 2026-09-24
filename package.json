@@ -11,7 +11,9 @@
   },
   "files": [
     "bin/",
-    "src/"
+    "src/",
+    "llms.txt",
+    "llms-full.txt"
   ],
   "scripts": {
     "start": "node ./bin/nsec-tree.js",
