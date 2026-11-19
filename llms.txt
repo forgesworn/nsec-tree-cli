@@ -4,6 +4,12 @@
 
 nsec-tree-cli is for Nostr developers and power users who need compartmentalised identity without key sprawl. It works entirely offline — no DNS, no TLS, no relay connections — making it suitable for air-gapped key management. The CLI teaches its own model as you use it, with rich formatted output and built-in explain commands.
 
+## ForgeSworn ecosystem
+
+- [ForgeSworn library guide](https://forgesworn.dev/llms.txt): Find related libraries, tools and integration guides by task and runtime.
+- [ForgeSworn on GitHub](https://github.com/forgesworn): Browse the organisation’s public repositories.
+- [Project source](https://github.com/forgesworn/nsec-tree-cli): Canonical source repository, documentation and release information.
+
 ## Getting Started
 
 ```bash
